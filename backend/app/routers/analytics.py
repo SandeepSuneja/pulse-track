@@ -10,18 +10,13 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import Activity, EffortLog, Goal, User
-from app.schemas import (
-    AnalyticsSummary,
-    CategoryBreakdown,
-    ParameterAverage,
-    TimeSeriesPoint,
-)
+from app.models import Activity, Goal, Task, User
+from app.routers.goals import _expire_overdue_goals
+from app.schemas import AnalyticsSummary, CategoryBreakdown, TaskBreakdown, TimeSeriesPoint
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 Period = Literal["day", "week", "month", "year", "custom"]
-EFFORT_PARAMS = ("focus", "consistency", "productivity", "energy", "wellbeing")
 
 
 def _resolve_range(period: Period, start: date | None, end: date | None) -> tuple[date, date]:
@@ -35,7 +30,6 @@ def _resolve_range(period: Period, start: date | None, end: date | None) -> tupl
         return today.replace(day=1), today
     if period == "year":
         return today.replace(month=1, day=1), today
-    # custom
     end_d = end or today
     start_d = start or (end_d - timedelta(days=29))
     return start_d, end_d
@@ -50,6 +44,7 @@ def analytics_summary(
     current_user: User = Depends(get_current_user),
 ) -> AnalyticsSummary:
     start_d, end_d = _resolve_range(period, start_date, end_date)
+    _expire_overdue_goals(db, current_user.id)
 
     activities = (
         db.query(Activity)
@@ -63,9 +58,11 @@ def analytics_summary(
 
     total_minutes = sum(a.duration_minutes for a in activities)
     by_category: dict[str, int] = defaultdict(int)
+    by_task: dict[int | None, int] = defaultdict(int)
     by_day: dict[date, int] = defaultdict(int)
     for a in activities:
         by_category[a.category] += a.duration_minutes
+        by_task[a.task_id] += a.duration_minutes
         by_day[a.activity_date] += a.duration_minutes
 
     category_breakdown = [
@@ -77,60 +74,64 @@ def analytics_summary(
         for cat, mins in sorted(by_category.items(), key=lambda x: x[1], reverse=True)
     ]
 
+    task_ids = [tid for tid in by_task.keys() if tid is not None]
+    task_meta = {
+        t.id: t
+        for t in db.query(Task).filter(Task.user_id == current_user.id, Task.id.in_(task_ids)).all()
+    } if task_ids else {}
+
+    task_breakdown: list[TaskBreakdown] = []
+    for task_id, mins in sorted(by_task.items(), key=lambda x: x[1], reverse=True):
+        if task_id is None:
+            title = "Unlinked logs"
+            category = "others"
+        else:
+            task = task_meta.get(task_id)
+            title = f"PT-{task_id} · {task.title}" if task else f"PT-{task_id}"
+            category = task.category if task else "others"
+        task_breakdown.append(
+            TaskBreakdown(
+                task_id=task_id,
+                title=title,
+                category=category,
+                minutes=mins,
+                percentage=round((mins / total_minutes) * 100, 1) if total_minutes else 0.0,
+            )
+        )
+
     minutes_over_time = [
         TimeSeriesPoint(date=d, value=float(by_day.get(d, 0)))
         for d in _daterange(start_d, end_d)
     ]
 
-    effort_rows = (
-        db.query(EffortLog)
-        .filter(
-            EffortLog.user_id == current_user.id,
-            EffortLog.log_date >= start_d,
-            EffortLog.log_date <= end_d,
-        )
-        .order_by(EffortLog.log_date.asc())
-        .all()
-    )
-    effort_map = {row.log_date: row for row in effort_rows}
-    effort_over_time: dict[str, list[TimeSeriesPoint]] = {}
-    for param in EFFORT_PARAMS:
-        series: list[TimeSeriesPoint] = []
-        for d in _daterange(start_d, end_d):
-            row = effort_map.get(d)
-            value = float(getattr(row, param)) if row else 0.0
-            series.append(TimeSeriesPoint(date=d, value=value))
-        effort_over_time[param] = series
-
-    effort_averages: list[ParameterAverage] = []
-    if effort_rows:
-        for param in EFFORT_PARAMS:
-            avg = sum(getattr(r, param) for r in effort_rows) / len(effort_rows)
-            effort_averages.append(ParameterAverage(parameter=param, average=round(avg, 2)))
-    else:
-        effort_averages = [ParameterAverage(parameter=p, average=0.0) for p in EFFORT_PARAMS]
-
     goals = (
         db.query(Goal)
-        .filter(Goal.user_id == current_user.id, Goal.is_active == 1)
+        .filter(Goal.user_id == current_user.id, Goal.status == "active")
         .all()
     )
     goal_progress = []
     for goal in goals:
-        actual = (
-            db.query(func.coalesce(func.sum(Activity.duration_minutes), 0))
-            .filter(
-                Activity.user_id == current_user.id,
-                Activity.category == goal.category,
-                Activity.activity_date >= start_d,
-                Activity.activity_date <= end_d,
-            )
-            .scalar()
+        linked_task_ids = [
+            row[0]
+            for row in db.query(Task.id)
+            .filter(Task.user_id == current_user.id, Task.goal_id == goal.id)
+            .all()
+        ]
+        q = db.query(func.coalesce(func.sum(Activity.duration_minutes), 0)).filter(
+            Activity.user_id == current_user.id,
+            Activity.activity_date >= start_d,
+            Activity.activity_date <= end_d,
         )
-        target = goal.target_minutes
-        # Scale weekly/monthly targets roughly to the selected window length
+        if linked_task_ids:
+            q = q.filter(Activity.task_id.in_(linked_task_ids))
+        else:
+            q = q.filter(Activity.category == goal.category)
+        actual = q.scalar()
+        target = goal.target_minutes or 0
         days = max((end_d - start_d).days + 1, 1)
-        if goal.period == "daily":
+        if not target or goal.period == "deadline":
+            scaled_target = 0
+        elif goal.period == "daily":
             scaled_target = target * days
         elif goal.period == "weekly":
             scaled_target = target * (days / 7)
@@ -157,9 +158,8 @@ def analytics_summary(
         total_minutes=total_minutes,
         activity_count=len(activities),
         category_breakdown=category_breakdown,
+        task_breakdown=task_breakdown,
         minutes_over_time=minutes_over_time,
-        effort_over_time=effort_over_time,
-        effort_averages=effort_averages,
         goal_progress=goal_progress,
     )
 

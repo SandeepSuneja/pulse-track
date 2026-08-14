@@ -6,12 +6,10 @@ from typing import Optional
 from sqlalchemy import (
     Date,
     DateTime,
-    Float,
     ForeignKey,
     Integer,
     String,
     Text,
-    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -35,35 +33,62 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    tasks: Mapped[list[Task]] = relationship(back_populates="user", cascade="all, delete-orphan")
     activities: Mapped[list[Activity]] = relationship(back_populates="user", cascade="all, delete-orphan")
     goals: Mapped[list[Goal]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    effort_logs: Mapped[list[EffortLog]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class Task(Base):
+    """Board ticket / planned work item."""
+
+    __tablename__ = "tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    goal_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("goals.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(80), index=True)
+    # health | learning | work | sleep | entertainment |
+    # personal_technical_projects | ai_content_generation | others
+    status: Mapped[str] = mapped_column(String(20), default="todo", index=True)
+    # todo | in_progress | completed
+    notes: Mapped[str] = mapped_column(Text, default="")
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
+    # Planned date the task comes into progress (In Progress)
+    # null = indefinite (no due date)
+    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
+    estimate_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="tasks")
+    goal: Mapped[Optional[Goal]] = relationship(back_populates="tasks")
+    activities: Mapped[list[Activity]] = relationship(
+        back_populates="task", cascade="all, delete-orphan"
+    )
 
 
 class Activity(Base):
-    """A single logged activity block (what you did and for how long)."""
+    """Time log entry against a board task."""
 
     __tablename__ = "activities"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    title: Mapped[str] = mapped_column(String(200))
-    category: Mapped[str] = mapped_column(String(80), index=True)
-    # health | learning | work | sleep | entertainment | others
-    status: Mapped[str] = mapped_column(String(20), default="todo", index=True)
-    # todo | in_progress | completed
+    task_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    # Denormalized for analytics / list display (copied from task on create)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    category: Mapped[str] = mapped_column(String(80), index=True, default="others")
     notes: Mapped[str] = mapped_column(Text, default="")
     activity_date: Mapped[date] = mapped_column(Date, index=True)
-    # null = indefinite (no due date)
-    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
     duration_minutes: Mapped[int] = mapped_column(Integer)
-    # Optional per-activity effort scores (1–10)
-    focus_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    energy_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    productivity_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="activities")
+    task: Mapped[Optional[Task]] = relationship(back_populates="activities")
 
 
 class Goal(Base):
@@ -75,31 +100,15 @@ class Goal(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(200))
     category: Mapped[str] = mapped_column(String(80), index=True)
-    target_minutes: Mapped[int] = mapped_column(Integer)
-    period: Mapped[str] = mapped_column(String(20), default="weekly")  # daily | weekly | monthly
-    start_date: Mapped[date] = mapped_column(Date)
+    # Null for deadline-only goals (period="deadline")
+    target_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    period: Mapped[str] = mapped_column(String(20), default="weekly")  # daily | weekly | monthly | deadline
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    is_active: Mapped[int] = mapped_column(Integer, default=1)  # 1/0 for SQLite simplicity
+    # active | completed | failed
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    is_active: Mapped[int] = mapped_column(Integer, default=1)  # 1 when status=active
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="goals")
-
-
-class EffortLog(Base):
-    """Daily self-assessment across improvement parameters (independent of activities)."""
-
-    __tablename__ = "effort_logs"
-    __table_args__ = (UniqueConstraint("user_id", "log_date", name="uq_user_effort_date"),)
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    log_date: Mapped[date] = mapped_column(Date, index=True)
-    focus: Mapped[float] = mapped_column(Float, default=5.0)
-    consistency: Mapped[float] = mapped_column(Float, default=5.0)
-    productivity: Mapped[float] = mapped_column(Float, default=5.0)
-    energy: Mapped[float] = mapped_column(Float, default=5.0)
-    wellbeing: Mapped[float] = mapped_column(Float, default=5.0)
-    notes: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    user: Mapped[User] = relationship(back_populates="effort_logs")
+    tasks: Mapped[list[Task]] = relationship(back_populates="goal")

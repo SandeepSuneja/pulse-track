@@ -1,38 +1,44 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
-import { CATEGORIES, categoryLabel } from '../constants'
+import { categoryLabel } from '../constants'
 
 const emptyForm = () => ({
-  title: '',
-  category: 'work',
-  status: 'todo',
+  task_id: '',
   notes: '',
   activity_date: new Date().toISOString().slice(0, 10),
-  hasDueDate: false,
-  due_date: new Date().toISOString().slice(0, 10),
   duration_minutes: 60,
-  focus_score: 7,
-  energy_score: 7,
-  productivity_score: 7,
 })
-
-const STATUS_LABELS = {
-  todo: 'To Do',
-  in_progress: 'In Progress',
-  completed: 'Done',
-}
 
 export default function Activities() {
   const { token } = useAuth()
   const [items, setItems] = useState([])
+  const [tasks, setTasks] = useState([])
   const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState(null)
+  const [editingTitle, setEditingTitle] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  async function load() {
-    const data = await api.listActivities(token)
-    setItems(data)
+  const isEditing = editingId != null
+
+  async function load({ preserveForm = false } = {}) {
+    const [logs, boardTasks] = await Promise.all([
+      api.listActivities(token),
+      api.listTasks(token, { status: 'in_progress' }),
+    ])
+    setItems(logs)
+    setTasks(boardTasks)
+    if (preserveForm) return
+    setForm((prev) => {
+      const stillValid = boardTasks.some((t) => String(t.id) === String(prev.task_id))
+      if (stillValid) return prev
+      return {
+        ...prev,
+        task_id: boardTasks.length > 0 ? String(boardTasks[0].id) : '',
+      }
+    })
   }
 
   useEffect(() => {
@@ -40,21 +46,67 @@ export default function Activities() {
     load().catch((err) => setError(err.message))
   }, [token])
 
+  function startEdit(item) {
+    setEditingId(item.id)
+    setEditingTitle(item.title || '')
+    setForm({
+      task_id: item.task_id ? String(item.task_id) : '',
+      notes: item.notes || '',
+      activity_date: item.activity_date,
+      duration_minutes: item.duration_minutes,
+    })
+    setError('')
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditingTitle('')
+    setForm((prev) => {
+      const stillValid = tasks.some((t) => String(t.id) === String(prev.task_id))
+      return {
+        ...emptyForm(),
+        task_id: stillValid
+          ? prev.task_id
+          : tasks.length > 0
+            ? String(tasks[0].id)
+            : '',
+      }
+    })
+  }
+
   async function onSubmit(e) {
     e.preventDefault()
+    if (!isEditing && !form.task_id) {
+      setError('Move a task to In Progress on the Board, then log time here.')
+      return
+    }
     setBusy(true)
     setError('')
     try {
-      const { hasDueDate, due_date, ...rest } = form
-      await api.createActivity(token, {
-        ...rest,
-        due_date: hasDueDate ? due_date : null,
-        duration_minutes: Number(form.duration_minutes),
-        focus_score: Number(form.focus_score),
-        energy_score: Number(form.energy_score),
-        productivity_score: Number(form.productivity_score),
-      })
-      setForm(emptyForm())
+      if (isEditing) {
+        await api.updateActivity(token, editingId, {
+          notes: form.notes,
+          activity_date: form.activity_date,
+          duration_minutes: Number(form.duration_minutes),
+        })
+        setEditingId(null)
+        setEditingTitle('')
+        setForm((prev) => ({
+          ...emptyForm(),
+          task_id: prev.task_id,
+        }))
+      } else {
+        await api.createActivity(token, {
+          task_id: Number(form.task_id),
+          notes: form.notes,
+          activity_date: form.activity_date,
+          duration_minutes: Number(form.duration_minutes),
+        })
+        setForm((prev) => ({
+          ...emptyForm(),
+          task_id: prev.task_id,
+        }))
+      }
       await load()
     } catch (err) {
       setError(err.message)
@@ -65,57 +117,67 @@ export default function Activities() {
 
   async function remove(id) {
     await api.deleteActivity(token, id)
-    await load()
+    if (editingId === id) {
+      cancelEdit()
+    }
+    await load({ preserveForm: editingId != null && editingId !== id })
   }
+
+  const selectedTask = tasks.find((t) => String(t.id) === String(form.task_id))
 
   return (
     <div className="page">
       <header className="page-head">
         <div>
           <h1>Activities</h1>
-          <p className="muted">Log timed work blocks. Use the Board to move tickets by status.</p>
+          <p className="muted">
+            Log time against <strong>In Progress</strong> tasks. Matching category time also advances{' '}
+            <Link to="/goals">Goals</Link>. Create and move tasks on the <Link to="/">Board</Link>.
+          </p>
         </div>
       </header>
 
       <div className="grid-2">
         <form className="panel stack" onSubmit={onSubmit}>
-          <h2>Log activity</h2>
-          <label>
-            Title
-            <input
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              required
-            />
-          </label>
-          <div className="row-2">
+          <h2>{isEditing ? 'Edit activity' : 'Log activity'}</h2>
+          {isEditing ? (
+            <p className="muted">
+              Task:{' '}
+              <strong>
+                {form.task_id ? `PT-${form.task_id}` : '—'}
+                {editingTitle ? ` · ${editingTitle}` : ''}
+              </strong>
+            </p>
+          ) : tasks.length === 0 ? (
+            <p className="muted">
+              No In Progress tasks. Move a task to In Progress on the <Link to="/">Board</Link>, then
+              come back to log time.
+            </p>
+          ) : (
             <label>
-              Category
+              Task
               <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                value={form.task_id}
+                onChange={(e) => setForm({ ...form, task_id: e.target.value })}
+                required
               >
-                {CATEGORIES.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
+                {tasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    PT-{task.id} · {task.title} ({categoryLabel(task.category)})
                   </option>
                 ))}
               </select>
             </label>
-            <label>
-              Status
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-              >
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          )}
+          {!isEditing && selectedTask && (selectedTask.activity_count || 0) > 0 && (
+            <p className="muted">
+              {selectedTask.activity_count}{' '}
+              {selectedTask.activity_count === 1 ? 'activity' : 'activities'}
+              {(selectedTask.logged_minutes || 0) > 0
+                ? ` · ${selectedTask.logged_minutes} min logged`
+                : ''}
+            </p>
+          )}
           <div className="row-2">
             <label>
               Date
@@ -137,60 +199,6 @@ export default function Activities() {
               />
             </label>
           </div>
-          <label className="check-row">
-            <span>
-              <input
-                type="checkbox"
-                checked={form.hasDueDate}
-                onChange={(e) => setForm({ ...form, hasDueDate: e.target.checked })}
-              />{' '}
-              Set a due date
-            </span>
-          </label>
-          {form.hasDueDate && (
-            <label>
-              Due date
-              <input
-                type="date"
-                value={form.due_date}
-                onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-                required
-              />
-            </label>
-          )}
-          {!form.hasDueDate && <p className="muted">This task is indefinite (no due date).</p>}
-          <div className="row-3">
-            <label>
-              Focus
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={form.focus_score}
-                onChange={(e) => setForm({ ...form, focus_score: e.target.value })}
-              />
-            </label>
-            <label>
-              Energy
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={form.energy_score}
-                onChange={(e) => setForm({ ...form, energy_score: e.target.value })}
-              />
-            </label>
-            <label>
-              Productivity
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={form.productivity_score}
-                onChange={(e) => setForm({ ...form, productivity_score: e.target.value })}
-              />
-            </label>
-          </div>
           <label>
             Notes
             <textarea
@@ -200,15 +208,22 @@ export default function Activities() {
             />
           </label>
           {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Save activity'}
-          </button>
+          <div className="row-2" style={{ alignItems: 'center' }}>
+            <button type="submit" disabled={busy || (!isEditing && tasks.length === 0)}>
+              {busy ? 'Saving…' : isEditing ? 'Save changes' : 'Save log'}
+            </button>
+            {isEditing && (
+              <button type="button" className="ghost-btn" disabled={busy} onClick={cancelEdit}>
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
 
         <div className="panel">
-          <h2>Recent</h2>
+          <h2>Recent logs</h2>
           {items.length === 0 ? (
-            <p className="muted">No activities logged yet.</p>
+            <p className="muted">No activity logs yet.</p>
           ) : (
             <ul className="record-list">
               {items.map((item) => (
@@ -217,13 +232,28 @@ export default function Activities() {
                     <strong>{item.title}</strong>
                     <p className="muted">
                       {item.activity_date} · {categoryLabel(item.category)} · {item.duration_minutes}{' '}
-                      min · {STATUS_LABELS[item.status] || item.status || 'To Do'}
-                      {item.due_date ? ` · Due ${item.due_date}` : ' · Ongoing'}
+                      min
+                      {item.task_id ? ` · PT-${item.task_id}` : ''}
                     </p>
                   </div>
-                  <button type="button" className="ghost-btn" onClick={() => remove(item.id)}>
-                    Delete
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      onClick={() => startEdit(item)}
+                      disabled={busy}
+                    >
+                      {editingId === item.id ? 'Editing…' : 'Edit'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      onClick={() => remove(item.id)}
+                      disabled={busy}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

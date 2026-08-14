@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
-  Legend,
+  Cell,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -11,19 +15,21 @@ import {
 } from 'recharts'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
+import { categoryLabel } from '../constants'
 
-const PARAM_COLORS = {
-  focus: '#3B82F6',
-  consistency: '#F59E0B',
-  productivity: '#06B6D4',
-  energy: '#EF4444',
-  wellbeing: '#22C55E',
+const COLORS = ['#22D3EE', '#34D399', '#FBBF24', '#FB7185', '#38BDF8', '#8BA3C7', '#A78BFA', '#F472B6']
+
+function hoursLabel(mins) {
+  if (mins >= 60) {
+    const h = mins / 60
+    return Number.isInteger(h) ? `${h}h` : `${h.toFixed(1)}h`
+  }
+  return `${mins}m`
 }
 
 export default function Analytics() {
   const { token } = useAuth()
   const [period, setPeriod] = useState('month')
-  const [selected, setSelected] = useState(['focus', 'productivity', 'energy'])
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
 
@@ -35,32 +41,46 @@ export default function Analytics() {
       .catch((err) => setError(err.message))
   }, [token, period])
 
-  const chartData =
-    data?.minutes_over_time.map((point) => {
-      const row = { date: point.date, minutes: point.value }
-      for (const param of Object.keys(PARAM_COLORS)) {
-        const series = data.effort_over_time[param] || []
-        const match = series.find((s) => s.date === point.date)
-        row[param] = match?.value ?? 0
-      }
-      return row
-    }) || []
+  const rangeLabel =
+    data && data.start_date === data.end_date
+      ? data.start_date
+      : data
+        ? `${data.start_date} → ${data.end_date}`
+        : ''
 
-  function toggleParam(param) {
-    setSelected((prev) =>
-      prev.includes(param) ? prev.filter((p) => p !== param) : [...prev, param],
-    )
-  }
+  const chartData =
+    data?.minutes_over_time.map((point) => ({
+      date: point.date,
+      minutes: point.value,
+    })) || []
+
+  const categoryChart =
+    data?.category_breakdown.map((item) => ({
+      name: categoryLabel(item.category),
+      minutes: item.minutes,
+      percentage: item.percentage,
+      category: item.category,
+    })) || []
+
+  const taskChart =
+    data?.task_breakdown?.map((item) => ({
+      name: item.title,
+      shortName:
+        item.title.length > 28 ? `${item.title.slice(0, 26)}…` : item.title,
+      minutes: item.minutes,
+      percentage: item.percentage,
+      category: categoryLabel(item.category),
+    })) || []
 
   return (
     <div className="page">
       <header className="page-head">
         <div>
           <h1>Analytics</h1>
-          <p className="muted">Compare parameters across time periods.</p>
+          <p className="muted">Time spent by category and by task across periods.</p>
         </div>
         <div className="period-toggle">
-          {['week', 'month', 'year'].map((p) => (
+          {['day', 'week', 'month', 'year'].map((p) => (
             <button
               key={p}
               type="button"
@@ -75,72 +95,145 @@ export default function Analytics() {
 
       {error && <p className="error">{error}</p>}
 
-      <div className="chip-row">
-        {Object.keys(PARAM_COLORS).map((param) => (
-          <button
-            key={param}
-            type="button"
-            className={`chip ${selected.includes(param) ? 'active' : ''}`}
-            onClick={() => toggleParam(param)}
-          >
-            {param}
-          </button>
-        ))}
-      </div>
-
       {data && (
         <>
           <section className="panel">
-            <h2>Effort trends</h2>
+            <h2>Logged minutes over time</h2>
             <div className="chart-wrap">
-              <ResponsiveContainer width="100%" height={320}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,55,70,0.08)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#5b7280' }} />
-                  <YAxis domain={[0, 10]} tick={{ fontSize: 11, fill: '#5b7280' }} />
-                  <Tooltip />
-                  <Legend />
-                  {selected.map((param) => (
+              <ResponsiveContainer width="100%" height={280}>
+                {period === 'day' ? (
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,211,238,0.12)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8BA3C7' }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#8BA3C7' }} />
+                    <Tooltip />
+                    <Bar dataKey="minutes" name="Minutes" fill="#22D3EE" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                ) : (
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,211,238,0.12)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8BA3C7' }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#8BA3C7' }} />
+                    <Tooltip />
                     <Line
-                      key={param}
                       type="monotone"
-                      dataKey={param}
-                      stroke={PARAM_COLORS[param]}
+                      dataKey="minutes"
+                      stroke="#22D3EE"
                       strokeWidth={2.5}
                       dot={false}
                       activeDot={{ r: 5 }}
                     />
-                  ))}
-                </LineChart>
+                  </LineChart>
+                )}
               </ResponsiveContainer>
             </div>
           </section>
 
-          <section className="panel">
-            <h2>Logged minutes over time</h2>
-            <div className="chart-wrap">
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,55,70,0.08)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#5b7280' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#5b7280' }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="minutes" stroke="#3B82F6" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-                </LineChart>
-              </ResponsiveContainer>
+          <section className="grid-2" style={{ marginTop: '1rem' }}>
+            <div className="panel">
+              <h2>By category</h2>
+              <p className="muted" style={{ marginTop: 0 }}>
+                {rangeLabel}
+              </p>
+              {categoryChart.length === 0 ? (
+                <p className="muted">No activity in this period yet.</p>
+              ) : (
+                <>
+                  <div className="chart-wrap">
+                    <ResponsiveContainer width="100%" height={240}>
+                      <PieChart>
+                        <Pie
+                          data={categoryChart}
+                          dataKey="minutes"
+                          nameKey="name"
+                          innerRadius={50}
+                          outerRadius={85}
+                          paddingAngle={3}
+                        >
+                          {categoryChart.map((_, i) => (
+                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value, _name, props) => [
+                            `${value} min (${props.payload.percentage}%)`,
+                            props.payload.name,
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="avg-grid">
+                    {categoryChart.map((item) => (
+                      <li key={item.category}>
+                        <span>{item.name}</span>
+                        <strong>
+                          {hoursLabel(item.minutes)} · {item.percentage}%
+                        </strong>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </div>
-          </section>
 
-          <section className="panel">
-            <h2>Parameter averages ({data.start_date} → {data.end_date})</h2>
-            <ul className="avg-grid">
-              {data.effort_averages.map((item) => (
-                <li key={item.parameter}>
-                  <span>{item.parameter}</span>
-                  <strong>{item.average}</strong>
-                </li>
-              ))}
-            </ul>
+            <div className="panel">
+              <h2>By task</h2>
+              <p className="muted" style={{ marginTop: 0 }}>
+                {rangeLabel}
+              </p>
+              {taskChart.length === 0 ? (
+                <p className="muted">No task logs in this period yet.</p>
+              ) : (
+                <>
+                  <div className="chart-wrap" style={{ height: Math.max(240, taskChart.length * 36) }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={taskChart}
+                        layout="vertical"
+                        margin={{ left: 8, right: 12, top: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,211,238,0.12)" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 11, fill: '#8BA3C7' }} />
+                        <YAxis
+                          type="category"
+                          dataKey="shortName"
+                          width={140}
+                          tick={{ fontSize: 11, fill: '#8BA3C7' }}
+                        />
+                        <Tooltip
+                          formatter={(value, _name, props) => [
+                            `${value} min (${props.payload.percentage}%)`,
+                            props.payload.name,
+                          ]}
+                          labelFormatter={() => ''}
+                        />
+                        <Bar dataKey="minutes" radius={[0, 8, 8, 0]}>
+                          {taskChart.map((_, i) => (
+                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="avg-grid">
+                    {taskChart.map((item) => (
+                      <li key={item.name}>
+                        <span>
+                          {item.name}
+                          <span className="muted" style={{ display: 'block', fontSize: '0.75rem' }}>
+                            {item.category}
+                          </span>
+                        </span>
+                        <strong>
+                          {hoursLabel(item.minutes)} · {item.percentage}%
+                        </strong>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
           </section>
         </>
       )}
