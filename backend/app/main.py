@@ -186,7 +186,7 @@ def ensure_sqlite_schema() -> None:
 async def lifespan(_app: FastAPI):
     settings = get_settings()
     Base.metadata.create_all(bind=engine)
-    if settings.database_url.startswith("sqlite"):
+    if settings.sqlalchemy_database_url.startswith("sqlite"):
         ensure_sqlite_schema()
     try:
         init_firebase(settings)

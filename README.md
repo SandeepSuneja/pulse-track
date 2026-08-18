@@ -53,9 +53,14 @@ Optional local-only skip: set `DEV_SKIP_AUTH=true` on the backend to accept `Bea
 
 ```
 pulse-track/
-  backend/     FastAPI app, SQLite (pulse_track.db)
+  backend/     FastAPI app, SQLite locally / PostgreSQL on AWS
   frontend/    React + Vite app
+  docs/        AWS deploy walkthrough
 ```
+
+## Deploy on AWS
+
+Web + a future mobile app share one HTTPS API and one PostgreSQL database. Follow [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md) (S3 + CloudFront, App Runner, RDS in `ap-south-1`).
 
 ## Run locally
 
