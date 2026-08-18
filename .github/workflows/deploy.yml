@@ -21,7 +21,7 @@ env:
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'pulse-track-api' }}
   ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
   ECS_SERVICE: ${{ vars.ECS_SERVICE || 'pulse-track-api' }}
-  ECS_TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION || 'default-pulse-track-api' }}
+  ECS_TASK_DEFINITION: ${{ vars.ECS_TASK_DEFINITION || 'default-pulse-track-api:6' }}
   ECS_CONTAINER_NAME: ${{ vars.ECS_CONTAINER_NAME || 'pulse-track-api' }}
   S3_BUCKET: ${{ vars.S3_BUCKET }}
   CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
