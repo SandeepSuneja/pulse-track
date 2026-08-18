@@ -60,7 +60,7 @@ pulse-track/
 
 ## Deploy on AWS
 
-Web + a future mobile app share one HTTPS API and one PostgreSQL database. Follow [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md) (S3 + CloudFront, App Runner, RDS in `ap-south-1`).
+Web + a future mobile app share one HTTPS API and one PostgreSQL database. Follow [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md). Pushes to `master` deploy through GitHub Actions (ECR + ECS, optional S3/CloudFront).
 
 ## Run locally
 

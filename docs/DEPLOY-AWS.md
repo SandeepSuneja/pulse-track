@@ -332,16 +332,17 @@ Optional later (not required for first deploy): custom domains `api.yourdomain.c
 
 ## Updating after the first deploy
 
-**API**
+Prefer the GitHub Actions pipeline in the next section. Manual commands are only a fallback.
+
+**API (ECS)**
 
 ```powershell
 aws ecr get-login-password --region $Region | docker login --username AWS --password-stdin $EcrUri
 docker build -t $ApiRepo ./backend
 docker tag "${ApiRepo}:latest" "${EcrUri}/${ApiRepo}:latest"
 docker push "${EcrUri}/${ApiRepo}:latest"
+aws ecs update-service --cluster YOUR_CLUSTER --service pulse-track-api --force-new-deployment --region $Region
 ```
-
-Then **App Runner → Deploy** (or rely on automatic deployments).
 
 **Web**
 
@@ -356,6 +357,149 @@ aws cloudfront create-invalidation --distribution-id EXXXXXXXXXXXXX --paths "/*"
 
 ---
 
+## 8. GitHub Actions (deploy on `master`)
+
+On every push to `master`, [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) builds the API image, pushes it to ECR, and rolls the ECS service. If `S3_BUCKET` is set, it also builds the frontend and syncs it to S3 (and invalidates CloudFront when `CLOUDFRONT_DISTRIBUTION_ID` is set).
+
+The workflow deploys **code only**. It does not run `copy_sqlite_to_postgres.py` and does not ship `pulse_track.db`. RDS data stays as-is after the one-time local copy. That script is a laptop command and refuses to run in CI.
+
+The workflow does **not** run on `initial-features`. Merge or push to `master`.
+
+### 8.1 Look up ECS names
+
+```powershell
+aws ecs list-clusters --region us-east-1
+aws ecs list-services --cluster YOUR_CLUSTER --region us-east-1
+aws ecs describe-task-definition --task-definition default-pulse-track-api --query "taskDefinition.containerDefinitions[].name" --region us-east-1
+```
+
+Use the cluster name (not the full ARN) for `ECS_CLUSTER`. The container name must match the name inside the task definition.
+
+### 8.2 IAM user for GitHub
+
+Create a dedicated user (do not reuse a console admin user):
+
+```powershell
+aws iam create-user --user-name github-actions-pulse-track
+aws iam create-access-key --user-name github-actions-pulse-track
+```
+
+Save the access key and secret. Attach this inline policy (replace `YOUR_CLUSTER` and the S3 bucket if you use one):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EcrPush",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:CompleteLayerUpload",
+        "ecr:InitiateLayerUpload",
+        "ecr:PutImage",
+        "ecr:UploadLayerPart",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EcsDeploy",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DescribeServices",
+        "ecs:DescribeTaskDefinition",
+        "ecs:DescribeTasks",
+        "ecs:ListTasks",
+        "ecs:RegisterTaskDefinition",
+        "ecs:UpdateService"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PassEcsRoles",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::529088267227:role/ecsTaskExecutionRole",
+        "arn:aws:iam::529088267227:role/ecsTaskRole"
+      ]
+    },
+    {
+      "Sid": "WebDeploy",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket",
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::YOUR_WEB_BUCKET",
+        "arn:aws:s3:::YOUR_WEB_BUCKET/*"
+      ]
+    },
+    {
+      "Sid": "CloudFrontInvalidate",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateInvalidation",
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+If `iam:PassRole` fails, copy the task role ARN from the task definition and add it to `PassEcsRoles`.
+
+```powershell
+aws iam put-user-policy --user-name github-actions-pulse-track --policy-name PulseTrackGitHubDeploy --policy-document file://github-deploy-policy.json
+```
+
+### 8.3 GitHub secrets
+
+Repo → **Settings → Secrets and variables → Actions → Secrets**:
+
+| Secret | Value |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | from `create-access-key` |
+| `AWS_SECRET_ACCESS_KEY` | from `create-access-key` |
+| `VITE_FIREBASE_API_KEY` | same as `frontend/.env` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | same as `frontend/.env` |
+| `VITE_FIREBASE_PROJECT_ID` | same as `frontend/.env` |
+| `VITE_FIREBASE_STORAGE_BUCKET` | same as `frontend/.env` |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | same as `frontend/.env` |
+| `VITE_FIREBASE_APP_ID` | same as `frontend/.env` |
+
+### 8.4 GitHub variables
+
+Repo → **Settings → Secrets and variables → Actions → Variables**:
+
+| Variable | Example | Required |
+|---|---|---|
+| `AWS_REGION` | `us-east-1` | no (defaults to `us-east-1`) |
+| `ECR_REPOSITORY` | `pulse-track-api` | no |
+| `ECS_CLUSTER` | cluster name from `list-clusters` | **yes** |
+| `ECS_SERVICE` | `pulse-track-api` | no |
+| `ECS_TASK_DEFINITION` | `default-pulse-track-api` | no |
+| `ECS_CONTAINER_NAME` | name from `describe-task-definition` | no (defaults to `pulse-track-api`) |
+| `S3_BUCKET` | `pulse-track-web-529088267227` | only for web deploy |
+| `CLOUDFRONT_DISTRIBUTION_ID` | `EXXXXXXXXXXXXX` | only to invalidate CDN |
+| `VITE_API_URL` | `https://your-alb-or-api-host` (no trailing slash) | required if `S3_BUCKET` is set |
+
+If `S3_BUCKET` is empty, the web job is skipped. The API still deploys.
+
+### 8.5 First run
+
+1. Merge `initial-features` into `master` (or push the workflow file to `master`).
+2. GitHub → **Actions** → **Deploy**.
+3. You can also run it manually: **Actions → Deploy → Run workflow**.
+
+If ECS desired count is `0`, the new image is still registered. Scale the service to `1` when you want it running. Start RDS first if the database is stopped, or the deploy wait step will fail health checks.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Check |
@@ -367,6 +511,11 @@ aws cloudfront create-invalidation --distribution-id EXXXXXXXXXXXXX --paths "/*"
 | `/board` CloudFront 403/404 | Custom error pages 403/404 → `/index.html` 200 |
 | Frontend still calls localhost | Rebuild with `$env:VITE_API_URL` set; `VITE_*` is compile-time |
 | RDS timeout from App Runner | VPC connector on RDS subnets; RDS SG allows the connector SG on 5432; public access off is expected |
+| GitHub Action: `ECS_CLUSTER` error | Set the variable; use `aws ecs list-clusters` |
+| GitHub Action: container does not exist | `ECS_CONTAINER_NAME` must match `describe-task-definition` container name |
+| GitHub Action: `iam:PassRole` denied | Add the task execution role (and task role) ARNs to the GitHub IAM policy |
+| GitHub Action waits then fails | RDS stopped or ECS cannot pull secrets; start RDS and check task stopped reason |
+| Workflow never runs | Push or merge to **`master`**, not `initial-features` |
 
 ---
 

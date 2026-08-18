@@ -1,6 +1,10 @@
-"""Copy local SQLite rows into PostgreSQL (RDS), preserving IDs.
+"""One-time local copy of SQLite rows into PostgreSQL (RDS), preserving IDs.
 
-Usage (from backend/):
+This is a manual laptop command. It is not part of Docker, ECS, or GitHub
+Actions. Production keeps using RDS after the first copy; later deploys
+only ship code.
+
+Usage (from backend/, on your machine only):
 
     python scripts/copy_sqlite_to_postgres.py --replace
 
@@ -90,6 +94,12 @@ def copy_data(*, sqlite_url: str, postgres_url: str, replace: bool) -> None:
 
 
 def main() -> None:
+    if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
+        raise SystemExit(
+            "Refusing to copy local SQLite into RDS from CI. "
+            "This script is a one-time local command, not part of deploy."
+        )
+
     parser = argparse.ArgumentParser(description="Copy pulse_track.db into RDS PostgreSQL")
     parser.add_argument("--replace", action="store_true", help="Wipe existing Postgres rows first")
     parser.add_argument(
