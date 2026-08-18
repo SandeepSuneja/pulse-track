@@ -14,16 +14,11 @@ import {
 } from 'recharts'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
-import { ScoreRing } from '../components/icons'
 
-const COLORS = ['#3B82F6', '#22C55E', '#F59E0B', '#EF4444', '#06B6D4', '#0B1220']
+const COLORS = ['#22D3EE', '#34D399', '#FBBF24', '#FB7185', '#38BDF8', '#8BA3C7']
 
 function hours(mins) {
   return `${(mins / 60).toFixed(1)}h`
-}
-
-function avg(data, key) {
-  return data?.effort_averages.find((x) => x.parameter === key)?.average ?? 0
 }
 
 export default function Dashboard() {
@@ -45,7 +40,7 @@ export default function Dashboard() {
       <header className="page-head">
         <div>
           <h1>Your pulse today</h1>
-          <p className="muted">Watch time, effort, and goals move together.</p>
+          <p className="muted">Watch time and goals move together.</p>
         </div>
         <div className="period-toggle">
           {['day', 'week', 'month', 'year'].map((p) => (
@@ -70,11 +65,11 @@ export default function Dashboard() {
         </Link>
         <Link className="action-link" to="/activities">
           <strong>Log activity</strong>
-          <span>Capture a focused block</span>
+          <span>Capture a timed work block</span>
         </Link>
-        <Link className="action-link" to="/effort">
-          <strong>Effort check-in</strong>
-          <span>Score how you showed up</span>
+        <Link className="action-link" to="/goals">
+          <strong>Goals</strong>
+          <span>Set targets, then log time on matching tasks</span>
         </Link>
       </section>
 
@@ -84,7 +79,9 @@ export default function Dashboard() {
             <article className="stat-tile cyan">
               <p className="stat-label">Logged time</p>
               <p className="stat-value">{hours(data.total_minutes)}</p>
-              <p className="stat-hint">{data.start_date} → {data.end_date}</p>
+              <p className="stat-hint">
+                {data.start_date} → {data.end_date}
+              </p>
             </article>
             <article className="stat-tile citrus">
               <p className="stat-label">Activities</p>
@@ -92,22 +89,15 @@ export default function Dashboard() {
               <p className="stat-hint">Track record entries</p>
             </article>
             <article className="stat-tile mint">
-              <p className="stat-label">Avg focus</p>
-              <p className="stat-value">{avg(data, 'focus')}</p>
-              <p className="stat-hint">Out of 10</p>
+              <p className="stat-label">Categories</p>
+              <p className="stat-value">{data.category_breakdown.length}</p>
+              <p className="stat-hint">Active this period</p>
             </article>
             <article className="stat-tile coral">
-              <p className="stat-label">Avg productivity</p>
-              <p className="stat-value">{avg(data, 'productivity')}</p>
-              <p className="stat-hint">Out of 10</p>
+              <p className="stat-label">Goals</p>
+              <p className="stat-value">{data.goal_progress.length}</p>
+              <p className="stat-hint">Active targets</p>
             </article>
-          </section>
-
-          <section className="rings-row">
-            <ScoreRing value={avg(data, 'focus')} label="Focus" color="#3B82F6" />
-            <ScoreRing value={avg(data, 'energy')} label="Energy" color="#F59E0B" />
-            <ScoreRing value={avg(data, 'consistency')} label="Consistency" color="#06B6D4" />
-            <ScoreRing value={avg(data, 'wellbeing')} label="Wellbeing" color="#22C55E" />
           </section>
 
           <section className="grid-2">
@@ -116,11 +106,11 @@ export default function Dashboard() {
               <div className="chart-wrap">
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={data.minutes_over_time}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748B' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#64748B' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,211,238,0.12)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8BA3C7' }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#8BA3C7' }} />
                     <Tooltip />
-                    <Bar dataKey="value" name="Minutes" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="value" name="Minutes" fill="#22D3EE" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -176,15 +166,19 @@ export default function Dashboard() {
                       <div className="goal-meta">
                         <strong>{g.title}</strong>
                         <span>
-                          {g.actual_minutes} / {g.target_minutes} min · {Math.round(g.completion_pct)}%
+                          {g.target_minutes
+                            ? `${g.actual_minutes} / ${g.target_minutes} min · ${Math.round(g.completion_pct)}%`
+                            : `${g.actual_minutes} min logged · due-date goal`}
                         </span>
                       </div>
-                      <div className="progress-track">
-                        <div
-                          className="progress-fill"
-                          style={{ width: `${Math.min(g.completion_pct, 100)}%` }}
-                        />
-                      </div>
+                      {g.target_minutes > 0 && (
+                        <div className="progress-track">
+                          <div
+                            className="progress-fill"
+                            style={{ width: `${Math.min(g.completion_pct, 100)}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </li>
                 ))}

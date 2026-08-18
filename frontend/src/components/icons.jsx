@@ -22,15 +22,6 @@ export function IconActivity({ className }) {
   )
 }
 
-export function IconEffort({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.7" />
-      <path d="M12 8v4l2.5 2.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 export function IconGoals({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -56,32 +47,5 @@ export function IconProfile({ className }) {
       <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.7" />
       <path d="M5 19c1.5-3.2 4-4.8 7-4.8S17.5 15.8 19 19" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </svg>
-  )
-}
-
-export function ScoreRing({ value, max = 10, label, color = '#3B82F6' }) {
-  const pct = Math.max(0, Math.min(1, Number(value) / max))
-  const r = 34
-  const c = 2 * Math.PI * r
-  const offset = c * (1 - pct)
-
-  return (
-    <div className="score-ring" style={{ '--ring': color }}>
-      <svg viewBox="0 0 84 84" className="score-ring-svg">
-        <circle cx="42" cy="42" r={r} className="score-ring-track" />
-        <circle
-          cx="42"
-          cy="42"
-          r={r}
-          className="score-ring-value"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-        />
-      </svg>
-      <div className="score-ring-label">
-        <strong>{Number(value).toFixed(1)}</strong>
-        <span>{label}</span>
-      </div>
-    </div>
   )
 }

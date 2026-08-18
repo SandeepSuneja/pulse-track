@@ -12,6 +12,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Local default is SQLite. Production (RDS) example:
+    # postgresql+psycopg2://USER:PASSWORD@HOST:5432/pulsetrack
     database_url: str = "sqlite:///./pulse_track.db"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
@@ -29,6 +31,15 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def sqlalchemy_database_url(self) -> str:
+        """Accept postgres:// or postgresql:// from RDS and pin the psycopg2 driver."""
+        url = self.database_url
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg2://" + url[len(prefix) :]
+        return url
 
 
 @lru_cache

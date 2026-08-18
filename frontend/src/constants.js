@@ -5,16 +5,20 @@ export const CATEGORIES = [
   { id: 'work', label: 'Work' },
   { id: 'sleep', label: 'Sleep' },
   { id: 'entertainment', label: 'Entertainment' },
+  { id: 'personal_technical_projects', label: 'Personal Technical Projects' },
+  { id: 'ai_content_generation', label: 'AI Content Generation' },
   { id: 'others', label: 'Others' },
 ]
 
 export const CATEGORY_COLORS = {
-  health: { bg: 'rgba(34,197,94,0.14)', fg: '#15803D' },
-  learning: { bg: 'rgba(6,182,212,0.14)', fg: '#0E7490' },
-  work: { bg: 'rgba(59,130,246,0.12)', fg: '#1D4ED8' },
-  sleep: { bg: 'rgba(99,102,241,0.14)', fg: '#4338CA' },
-  entertainment: { bg: 'rgba(245,158,11,0.14)', fg: '#B45309' },
-  others: { bg: 'rgba(148,163,184,0.18)', fg: '#475569' },
+  health: { bg: 'rgba(52,211,153,0.16)', fg: '#6EE7B7' },
+  learning: { bg: 'rgba(34,211,238,0.16)', fg: '#67E8F9' },
+  work: { bg: 'rgba(56,189,248,0.16)', fg: '#7DD3FC' },
+  sleep: { bg: 'rgba(125,211,252,0.14)', fg: '#BAE6FD' },
+  entertainment: { bg: 'rgba(251,191,36,0.16)', fg: '#FCD34D' },
+  personal_technical_projects: { bg: 'rgba(14,165,233,0.18)', fg: '#38BDF8' },
+  ai_content_generation: { bg: 'rgba(244,114,182,0.16)', fg: '#F9A8D4' },
+  others: { bg: 'rgba(148,163,184,0.16)', fg: '#CBD5E1' },
 }
 
 export function categoryLabel(category) {

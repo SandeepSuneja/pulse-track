@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class UserBase(BaseModel):
@@ -31,22 +31,66 @@ class UserOut(UserBase):
     created_at: datetime
 
 
-ACTIVITY_STATUSES = ("todo", "in_progress", "completed")
-ACTIVITY_CATEGORIES = ("health", "learning", "work", "sleep", "entertainment", "others")
+TASK_STATUSES = ("todo", "in_progress", "completed")
+TASK_CATEGORIES = (
+    "health",
+    "learning",
+    "work",
+    "sleep",
+    "entertainment",
+    "personal_technical_projects",
+    "ai_content_generation",
+    "others",
+)
+CATEGORY_PATTERN = (
+    "^(health|learning|work|sleep|entertainment|"
+    "personal_technical_projects|ai_content_generation|others)$"
+)
+STATUS_PATTERN = "^(todo|in_progress|completed)$"
+
+
+class TaskBase(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    category: str = Field(pattern=CATEGORY_PATTERN)
+    status: str = Field(default="todo", pattern=STATUS_PATTERN)
+    notes: str = ""
+    start_date: Optional[date] = None
+    due_date: Optional[date] = None
+    estimate_minutes: int = Field(default=60, ge=1, le=24 * 60)
+    goal_id: Optional[int] = None
+
+
+class TaskCreate(TaskBase):
+    pass
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    category: Optional[str] = Field(default=None, pattern=CATEGORY_PATTERN)
+    status: Optional[str] = Field(default=None, pattern=STATUS_PATTERN)
+    notes: Optional[str] = None
+    start_date: Optional[date] = None
+    due_date: Optional[date] = None
+    estimate_minutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
+    goal_id: Optional[int] = None
+
+
+class TaskOut(TaskBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    created_at: datetime
+    logged_minutes: int = 0
+    activity_count: int = 0
+    goal_title: Optional[str] = None
 
 
 class ActivityBase(BaseModel):
-    title: str = Field(min_length=1, max_length=200)
-    category: str = Field(pattern="^(health|learning|work|sleep|entertainment|others)$")
-    status: str = Field(default="todo", pattern="^(todo|in_progress|completed)$")
+    task_id: int
     notes: str = ""
     activity_date: date
-    # null / omitted = indefinite task (no due date)
-    due_date: Optional[date] = None
     duration_minutes: int = Field(ge=1, le=24 * 60)
-    focus_score: Optional[int] = Field(default=None, ge=1, le=10)
-    energy_score: Optional[int] = Field(default=None, ge=1, le=10)
-    productivity_score: Optional[int] = Field(default=None, ge=1, le=10)
 
 
 class ActivityCreate(ActivityBase):
@@ -54,52 +98,76 @@ class ActivityCreate(ActivityBase):
 
 
 class ActivityUpdate(BaseModel):
-    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    category: Optional[str] = Field(
-        default=None, pattern="^(health|learning|work|sleep|entertainment|others)$"
-    )
-    status: Optional[str] = Field(default=None, pattern="^(todo|in_progress|completed)$")
     notes: Optional[str] = None
     activity_date: Optional[date] = None
-    due_date: Optional[date] = None
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
-    focus_score: Optional[int] = Field(default=None, ge=1, le=10)
-    energy_score: Optional[int] = Field(default=None, ge=1, le=10)
-    productivity_score: Optional[int] = Field(default=None, ge=1, le=10)
 
 
-class ActivityOut(ActivityBase):
+class ActivityOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     user_id: int
+    task_id: Optional[int]
+    title: str
+    category: str
+    notes: str
+    activity_date: date
+    duration_minutes: int
     created_at: datetime
+
+
+class GoalTaskBrief(BaseModel):
+    id: int
+    title: str
+    status: str
+    category: str
 
 
 class GoalBase(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    category: str = Field(pattern="^(health|learning|work|sleep|entertainment|others)$")
-    target_minutes: int = Field(ge=1)
-    period: str = Field(pattern="^(daily|weekly|monthly)$")
-    start_date: date
-    end_date: Optional[date] = None
+    category: str = Field(pattern=CATEGORY_PATTERN)
+    # Hours-based goals use target_minutes + period (daily|weekly|monthly).
+    # Deadline goals use end_date and period="deadline" with no target.
+    target_minutes: int | None = Field(default=None, ge=1)
+    period: str = Field(default="weekly", pattern="^(daily|weekly|monthly|deadline)$")
+    start_date: date | None = None
+    end_date: date | None = None
     is_active: bool = True
 
 
 class GoalCreate(GoalBase):
-    pass
+    task_ids: list[int] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_hours_or_due_date(self) -> GoalCreate:
+        has_hours = self.target_minutes is not None
+        has_due = self.end_date is not None
+        if has_hours and has_due:
+            raise ValueError("Choose either target hours or a due date, not both")
+        if not has_hours and not has_due:
+            raise ValueError("Set target hours or a due date")
+        if has_hours:
+            if self.period == "deadline":
+                raise ValueError("Hours-based goals need a daily, weekly, or monthly period")
+            self.end_date = None
+        else:
+            self.period = "deadline"
+            self.target_minutes = None
+        return self
 
 
 class GoalUpdate(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    category: Optional[str] = Field(
-        default=None, pattern="^(health|learning|work|sleep|entertainment|others)$"
-    )
-    target_minutes: Optional[int] = Field(default=None, ge=1)
-    period: Optional[str] = Field(default=None, pattern="^(daily|weekly|monthly)$")
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    category: Optional[str] = Field(default=None, pattern=CATEGORY_PATTERN)
+    target_minutes: int | None = Field(default=None, ge=1)
+    period: Optional[str] = Field(default=None, pattern="^(daily|weekly|monthly|deadline)$")
+    start_date: date | None = None
+    # end_date can only be set once (when previously null); never changed afterward
+    end_date: date | None = None
+    status: Optional[str] = Field(default=None, pattern="^(active|completed|failed)$")
     is_active: Optional[bool] = None
+    task_ids: Optional[list[int]] = None
 
 
 class GoalOut(BaseModel):
@@ -109,34 +177,15 @@ class GoalOut(BaseModel):
     user_id: int
     title: str
     category: str
-    target_minutes: int
+    target_minutes: int | None
     period: str
-    start_date: date
-    end_date: Optional[date]
+    start_date: date | None
+    end_date: date | None
+    status: str
     is_active: bool
     created_at: datetime
-
-
-class EffortLogBase(BaseModel):
-    log_date: date
-    focus: float = Field(ge=0, le=10)
-    consistency: float = Field(ge=0, le=10)
-    productivity: float = Field(ge=0, le=10)
-    energy: float = Field(ge=0, le=10)
-    wellbeing: float = Field(ge=0, le=10)
-    notes: str = ""
-
-
-class EffortLogCreate(EffortLogBase):
-    pass
-
-
-class EffortLogOut(EffortLogBase):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    user_id: int
-    created_at: datetime
+    task_ids: list[int] = Field(default_factory=list)
+    tasks: list[GoalTaskBrief] = Field(default_factory=list)
 
 
 class TimeSeriesPoint(BaseModel):
@@ -150,9 +199,12 @@ class CategoryBreakdown(BaseModel):
     percentage: float
 
 
-class ParameterAverage(BaseModel):
-    parameter: str
-    average: float
+class TaskBreakdown(BaseModel):
+    task_id: int | None = None
+    title: str
+    category: str
+    minutes: int
+    percentage: float
 
 
 class AnalyticsSummary(BaseModel):
@@ -162,7 +214,6 @@ class AnalyticsSummary(BaseModel):
     total_minutes: int
     activity_count: int
     category_breakdown: list[CategoryBreakdown]
+    task_breakdown: list[TaskBreakdown] = []
     minutes_over_time: list[TimeSeriesPoint]
-    effort_over_time: dict[str, list[TimeSeriesPoint]]
-    effort_averages: list[ParameterAverage]
     goal_progress: list[dict]

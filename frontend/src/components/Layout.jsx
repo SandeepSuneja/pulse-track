@@ -20,20 +20,18 @@ import MenuIcon from '@mui/icons-material/Menu'
 import ViewKanbanOutlinedIcon from '@mui/icons-material/ViewKanbanOutlined'
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined'
 import TimelineOutlinedIcon from '@mui/icons-material/TimelineOutlined'
-import FavoriteBorderOutlinedIcon from '@mui/icons-material/FavoriteBorderOutlined'
 import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined'
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined'
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import { useAuth } from '../AuthContext'
 
-const DRAWER_WIDTH = 252
+const DRAWER_WIDTH = 260
 
 const links = [
   { to: '/', label: 'Board', icon: ViewKanbanOutlinedIcon },
   { to: '/dashboard', label: 'Dashboard', icon: DashboardOutlinedIcon },
   { to: '/activities', label: 'Activities', icon: TimelineOutlinedIcon },
-  { to: '/effort', label: 'Effort', icon: FavoriteBorderOutlinedIcon },
   { to: '/goals', label: 'Goals', icon: FlagOutlinedIcon },
   { to: '/analytics', label: 'Analytics', icon: InsightsOutlinedIcon },
   { to: '/profile', label: 'Profile', icon: PersonOutlineOutlinedIcon },
@@ -50,28 +48,44 @@ function NavContent({ onNavigate }) {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: '#0B1220',
-        color: '#E2E8F0',
-        backgroundImage:
-          'radial-gradient(420px 240px at 0% 0%, rgba(59,130,246,0.18), transparent 60%)',
+        bgcolor: '#070E1A',
+        color: '#E8F1FF',
+        borderRight: '1px solid rgba(34,211,238,0.12)',
+        backgroundImage: `
+          radial-gradient(1px 1px at 20% 30%, rgba(232,241,255,0.45), transparent),
+          radial-gradient(1px 1px at 70% 60%, rgba(34,211,238,0.4), transparent),
+          radial-gradient(1px 1px at 40% 80%, rgba(125,211,252,0.35), transparent),
+          radial-gradient(380px 220px at 0% 0%, rgba(34,211,238,0.12), transparent 60%),
+          linear-gradient(180deg, #0A1220 0%, #060B14 100%)
+        `,
       }}
     >
-      <Box sx={{ px: 2, pt: 2.5, pb: 1.75 }}>
-        <Stack direction="row" spacing={1.25} alignItems="center">
+      <Box sx={{ px: 2.25, pt: 2.75, pb: 2 }}>
+        <Stack direction="row" spacing={1.35} alignItems="center">
           <Box
             sx={{
-              width: 38,
-              height: 38,
-              borderRadius: '12px',
+              width: 40,
+              height: 40,
+              borderRadius: '10px',
               display: 'grid',
               placeItems: 'center',
-              fontFamily: 'Sora, sans-serif',
+              fontFamily: 'Syne, sans-serif',
               fontWeight: 800,
-              fontSize: 12,
-              color: '#fff',
-              background: 'linear-gradient(145deg, #60A5FA, #2563EB)',
-              boxShadow: '0 8px 18px rgba(37,99,235,0.35)',
+              fontSize: 11,
+              letterSpacing: '0.06em',
+              color: '#041018',
+              background: 'linear-gradient(145deg, #67E8F9, #0891B2)',
+              border: '1px solid rgba(103,232,249,0.45)',
               flexShrink: 0,
+              position: 'relative',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                inset: -3,
+                borderRadius: '12px',
+                border: '1px solid rgba(34,211,238,0.2)',
+                pointerEvents: 'none',
+              },
             }}
           >
             PT
@@ -80,24 +94,34 @@ function NavContent({ onNavigate }) {
             <Typography
               noWrap
               sx={{
-                fontFamily: 'Sora, sans-serif',
+                fontFamily: 'Syne, sans-serif',
                 fontWeight: 700,
-                fontSize: '0.95rem',
+                fontSize: '1rem',
                 letterSpacing: '-0.02em',
-                color: '#fff',
-                lineHeight: 1.2,
+                color: '#F0F7FF',
+                lineHeight: 1.15,
               }}
             >
               Pulse Track
             </Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.55)', lineHeight: 1.2 }}>
-              Workspace
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'rgba(103,232,249,0.7)',
+                lineHeight: 1.2,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                fontSize: '0.62rem',
+                fontWeight: 700,
+              }}
+            >
+              Orbital Ops
             </Typography>
           </Box>
         </Stack>
       </Box>
 
-      <List sx={{ px: 1.25, py: 0.5, flex: 1 }}>
+      <List sx={{ px: 1.35, py: 0.5, flex: 1 }}>
         {links.map((link) => {
           const Icon = link.icon
           const selected =
@@ -110,19 +134,20 @@ function NavContent({ onNavigate }) {
               selected={selected}
               onClick={onNavigate}
               sx={{
-                mb: 0.35,
+                mb: 0.4,
                 minHeight: 44,
                 borderRadius: '10px',
                 px: 1.25,
-                color: 'rgba(226,232,240,0.78)',
+                color: 'rgba(232,241,255,0.68)',
+                transition: 'background-color 0.15s ease, color 0.15s ease',
                 '&.Mui-selected': {
-                  bgcolor: 'rgba(59,130,246,0.18)',
-                  color: '#BFDBFE',
-                  boxShadow: 'inset 3px 0 0 #3B82F6',
-                  '&:hover': { bgcolor: 'rgba(59,130,246,0.24)' },
-                  '& .MuiListItemIcon-root': { color: '#BFDBFE' },
+                  bgcolor: 'rgba(34,211,238,0.12)',
+                  color: '#67E8F9',
+                  boxShadow: 'inset 2px 0 0 #22D3EE',
+                  '&:hover': { bgcolor: 'rgba(34,211,238,0.16)' },
+                  '& .MuiListItemIcon-root': { color: '#67E8F9' },
                 },
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.04)', color: '#E8F1FF' },
               }}
             >
               <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
@@ -130,34 +155,39 @@ function NavContent({ onNavigate }) {
               </ListItemIcon>
               <ListItemText
                 primary={link.label}
-                primaryTypographyProps={{ fontWeight: 600, fontSize: 0.9 }}
+                primaryTypographyProps={{
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                  fontFamily: 'Space Grotesk, sans-serif',
+                }}
               />
             </ListItemButton>
           )
         })}
       </List>
 
-      <Box sx={{ p: 1.75, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <Box sx={{ p: 1.75, borderTop: '1px solid rgba(34,211,238,0.1)' }}>
         <Stack direction="row" spacing={1.25} alignItems="center" mb={1.25}>
           <Avatar
             sx={{
               width: 34,
               height: 34,
-              bgcolor: 'rgba(59,130,246,0.2)',
-              color: '#BFDBFE',
+              bgcolor: 'rgba(34,211,238,0.15)',
+              color: '#67E8F9',
               fontWeight: 700,
-              fontSize: 0.8,
+              fontSize: '0.8rem',
+              border: '1px solid rgba(34,211,238,0.3)',
               flexShrink: 0,
             }}
           >
             {(user?.displayName || user?.email || '?').slice(0, 1).toUpperCase()}
           </Avatar>
           <Box sx={{ minWidth: 0 }}>
-            <Typography noWrap fontWeight={600} fontSize={0.82} color="#fff">
+            <Typography noWrap fontWeight={600} fontSize={0.82} color="#E8F1FF">
               {user?.displayName || user?.email}
             </Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(226,232,240,0.5)' }}>
-              Signed in
+            <Typography variant="caption" sx={{ color: 'rgba(139,163,199,0.75)' }}>
+              Crew member
             </Typography>
           </Box>
         </Stack>
@@ -171,12 +201,13 @@ function NavContent({ onNavigate }) {
             navigate('/login')
           }}
           sx={{
-            color: '#E2E8F0',
-            borderColor: 'rgba(255,255,255,0.12)',
+            color: '#C5D4E8',
+            borderColor: 'rgba(34,211,238,0.22)',
             minHeight: 38,
             '&:hover': {
-              borderColor: '#93C5FD',
-              bgcolor: 'rgba(37,99,235,0.1)',
+              borderColor: '#22D3EE',
+              bgcolor: 'rgba(34,211,238,0.08)',
+              color: '#67E8F9',
             },
           }}
         >
@@ -211,7 +242,7 @@ export default function Layout() {
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { width: DRAWER_WIDTH, border: 0 },
+            '& .MuiDrawer-paper': { width: DRAWER_WIDTH, border: 0, bgcolor: '#070E1A' },
           }}
         >
           <NavContent onNavigate={() => setMobileOpen(false)} />
@@ -224,7 +255,7 @@ export default function Layout() {
             '& .MuiDrawer-paper': {
               width: DRAWER_WIDTH,
               border: 0,
-              borderRight: '1px solid rgba(15,23,42,0.06)',
+              bgcolor: '#070E1A',
             },
           }}
         >
@@ -240,6 +271,7 @@ export default function Layout() {
           minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
+          position: 'relative',
         }}
       >
         <Box
@@ -252,31 +284,44 @@ export default function Layout() {
             display: 'flex',
             alignItems: 'center',
             gap: 1.5,
-            bgcolor: 'rgba(248,250,252,0.82)',
-            backdropFilter: 'blur(12px)',
-            borderBottom: '1px solid',
-            borderColor: 'divider',
+            bgcolor: 'rgba(6,11,20,0.78)',
+            backdropFilter: 'blur(14px)',
+            borderBottom: '1px solid rgba(34,211,238,0.12)',
           }}
         >
           {isMobile && (
-            <IconButton onClick={() => setMobileOpen(true)} edge="start" size="small">
+            <IconButton onClick={() => setMobileOpen(true)} edge="start" size="small" sx={{ color: '#67E8F9' }}>
               <MenuIcon />
             </IconButton>
           )}
           <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-            <Typography variant="body2" color="text.secondary" noWrap>
-              Pulse Track
+            <Typography
+              variant="body2"
+              noWrap
+              sx={{ color: 'rgba(139,163,199,0.85)', letterSpacing: '0.04em', fontSize: '0.75rem' }}
+            >
+              PULSE TRACK
             </Typography>
             <Box
               sx={{
                 width: 4,
                 height: 4,
-                borderRadius: '50%',
-                bgcolor: 'text.disabled',
+                borderRadius: '1px',
+                bgcolor: '#22D3EE',
                 flexShrink: 0,
+                opacity: 0.7,
               }}
             />
-            <Typography variant="subtitle2" fontWeight={700} noWrap>
+            <Typography
+              noWrap
+              sx={{
+                fontFamily: 'Syne, sans-serif',
+                fontWeight: 700,
+                fontSize: '0.92rem',
+                letterSpacing: '-0.02em',
+                color: '#E8F1FF',
+              }}
+            >
               {active?.label || 'Board'}
             </Typography>
           </Stack>
@@ -287,18 +332,27 @@ export default function Layout() {
               alignItems: 'center',
               gap: 0.75,
               px: 1.25,
-              py: 0.5,
-              borderRadius: 999,
-              bgcolor: 'rgba(34,197,94,0.1)',
-              color: '#16A34A',
-              fontSize: 0.72,
+              py: 0.45,
+              borderRadius: '8px',
+              bgcolor: 'rgba(34,211,238,0.1)',
+              border: '1px solid rgba(34,211,238,0.25)',
+              color: '#67E8F9',
+              fontSize: '0.68rem',
               fontWeight: 700,
-              letterSpacing: '0.04em',
+              letterSpacing: '0.1em',
               textTransform: 'uppercase',
             }}
           >
-            <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'currentColor' }} />
-            Live
+            <Box
+              sx={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                bgcolor: 'currentColor',
+                animation: 'pulse-signal 2.2s ease-in-out infinite',
+              }}
+            />
+            Signal live
           </Box>
         </Box>
 
@@ -306,10 +360,10 @@ export default function Layout() {
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             >
               <Outlet />
             </motion.div>
