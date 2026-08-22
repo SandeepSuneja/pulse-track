@@ -269,6 +269,121 @@ button:not(.MuiButtonBase-root):disabled {
   color: var(--ink);
 }
 
+.activities-logs-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.activities-logs-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.table-filters {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.4fr) repeat(4, minmax(120px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.data-table-wrap {
+  max-height: min(62vh, 640px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(5, 10, 18, 0.35);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 11px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(18, 28, 46, 0.96);
+  color: #c5d4e8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom-color: var(--line-strong);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.data-table tbody tr:hover td {
+  background: rgba(34, 211, 238, 0.04);
+}
+
+.data-table tbody tr.is-editing td {
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table .nowrap {
+  white-space: nowrap;
+}
+
+.data-table .notes-cell {
+  max-width: 280px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table .actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.table-primary {
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.table-secondary {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.table-actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.table-actions .ghost-btn {
+  min-height: 34px;
+  padding: 4px 10px;
+  font-size: 0.8125rem;
+}
+
 .check-row {
   display: flex;
   align-items: center;
@@ -774,7 +889,26 @@ button:not(.MuiButtonBase-root):disabled {
 
 @media (max-width: 960px) {
   .stat-row,
-  .quick-actions {
+  .quick-actions,
+  .grid-2 {
     grid-template-columns: 1fr;
+  }
+
+  .table-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .data-table .notes-cell {
+    max-width: 160px;
+  }
+}
+
+@media (max-width: 640px) {
+  .table-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .activities-logs-head {
+    flex-direction: column;
   }
 }
