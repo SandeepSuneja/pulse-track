@@ -85,6 +85,9 @@ const labelSx = {
   letterSpacing: '-0.01em',
 }
 
+const whiteCalendarIcon =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23E8F1FF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E\")"
+
 const controlSx = {
   width: '100%',
   '& .MuiOutlinedInput-root': {
@@ -96,6 +99,21 @@ const controlSx = {
     display: 'flex',
     alignItems: 'center',
     py: 1.1,
+  },
+  '& input[type="date"]': {
+    colorScheme: 'dark',
+  },
+  '& input[type="date"]::-webkit-calendar-picker-indicator': {
+    cursor: 'pointer',
+    opacity: 1,
+    width: '1.1rem',
+    height: '1.1rem',
+    backgroundColor: 'transparent',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'center',
+    backgroundSize: '1.1rem 1.1rem',
+    backgroundImage: whiteCalendarIcon,
+    filter: 'none',
   },
 }
 
@@ -1121,14 +1139,26 @@ export default function Board() {
                 Cancel
               </Button>
               {showDetailsSection ? (
-                <Button type="submit" variant="contained" disabled={busy || !form.title.trim()}>
+                <Button
+                  key="save-task"
+                  type="submit"
+                  variant="contained"
+                  disabled={busy || !form.title.trim()}
+                >
                   {busy ? 'Saving…' : isEditing ? 'Save changes' : 'Create task'}
                 </Button>
               ) : (
                 <Button
+                  key="goto-details"
                   type="button"
                   variant="contained"
-                  onClick={() => setDialogSection('details')}
+                  onClick={(e) => {
+                    // Defer section switch so this click cannot land on the
+                    // Save submit button that replaces this control.
+                    e.preventDefault()
+                    e.stopPropagation()
+                    queueMicrotask(() => setDialogSection('details'))
+                  }}
                 >
                   Task information
                 </Button>
