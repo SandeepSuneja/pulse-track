@@ -62,6 +62,10 @@ pulse-track/
 
 Web + a future mobile app share one HTTPS API and one PostgreSQL database. Follow [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md). Pushes to `master` deploy through GitHub Actions (ECR + ECS, optional S3/CloudFront).
 
+For a screen-by-screen description of what users can do in the app, see [docs/UI-ABILITIES.md](docs/UI-ABILITIES.md).
+
+For **mobile app development** with the same features (API contracts, business rules, and screen specs), see [docs/MOBILE-UI-SPEC.md](docs/MOBILE-UI-SPEC.md).
+
 ## Run locally
 
 ### Backend

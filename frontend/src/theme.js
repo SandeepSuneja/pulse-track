@@ -92,6 +92,35 @@ const theme = createTheme({
           `,
           backgroundAttachment: 'fixed',
           color: ink,
+          scrollbarWidth: 'thin',
+          scrollbarColor: `${alpha(accent, 0.28)} rgba(5,10,18,0.85)`,
+        },
+        '*::-webkit-scrollbar': {
+          width: 10,
+          height: 10,
+        },
+        '*::-webkit-scrollbar-track': {
+          background: 'rgba(5,10,18,0.85)',
+          borderRadius: 999,
+        },
+        '*::-webkit-scrollbar-thumb': {
+          background: `linear-gradient(180deg, ${alpha('#67E8F9', 0.35)}, ${alpha(accent, 0.28)})`,
+          borderRadius: 999,
+          border: '2px solid transparent',
+          backgroundClip: 'padding-box',
+          boxShadow: `inset 0 0 0 1px ${alpha(accent, 0.15)}`,
+        },
+        '*::-webkit-scrollbar-thumb:hover': {
+          background: `linear-gradient(180deg, ${alpha('#67E8F9', 0.55)}, ${alpha(accent, 0.48)})`,
+          backgroundClip: 'padding-box',
+        },
+        '*::-webkit-scrollbar-corner': {
+          background: 'transparent',
+        },
+        '*::-webkit-scrollbar-button': {
+          display: 'none',
+          width: 0,
+          height: 0,
         },
       },
     },
@@ -153,6 +182,12 @@ const theme = createTheme({
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
             borderColor: accent,
           },
+        },
+        input: {
+          '&[type="date"], &[type="datetime-local"], &[type="time"], &[type="month"], &[type="week"]':
+            {
+              colorScheme: 'dark',
+            },
         },
         notchedOutline: {
           borderColor: alpha('#E8F1FF', 0.12),
