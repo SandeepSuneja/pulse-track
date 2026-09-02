@@ -3,6 +3,13 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
 import { CATEGORIES, categoryLabel } from '../constants'
+import {
+  SLEEP_QUALITY_LABEL,
+  SLEEP_QUALITY_STYLE,
+  classifySleepQuality,
+  sleepDurationMinutes,
+} from '../sleep'
+import { combineDuration, formatDuration } from '../duration'
 
 const emptyForm = () => ({
   title: '',
@@ -19,7 +26,10 @@ const emptyLogForm = () => ({
   task_id: '',
   notes: '',
   activity_date: new Date().toISOString().slice(0, 10),
-  duration_minutes: 60,
+  duration_hours: 1,
+  duration_minutes: 0,
+  sleep_start_time: '23:00',
+  sleep_end_time: '06:30',
 })
 
 function goalToForm(goal) {
@@ -138,9 +148,24 @@ export default function Goals() {
     if (!logGoal) return []
     const linked = new Set(logGoal.task_ids || [])
     return allTasks.filter(
-      (t) => t.status === 'in_progress' && (linked.size === 0 ? t.category === logGoal.category : linked.has(t.id)),
+      (t) =>
+        t.status === 'in_progress' &&
+        (linked.size === 0 ? t.category === logGoal.category : linked.has(t.id)),
     )
   }, [allTasks, logGoal])
+
+  const logTask = useMemo(
+    () => matchingLogTasks.find((t) => String(t.id) === String(logForm.task_id)) || null,
+    [matchingLogTasks, logForm.task_id],
+  )
+  const isSleepLog = logTask?.category === 'sleep'
+  const logSleepMinutes = isSleepLog
+    ? sleepDurationMinutes(logForm.sleep_start_time, logForm.sleep_end_time)
+    : null
+  const logSleepQuality = isSleepLog
+    ? classifySleepQuality(logForm.sleep_start_time, logForm.sleep_end_time)
+    : null
+  const logSleepStyle = SLEEP_QUALITY_STYLE[logSleepQuality] || SLEEP_QUALITY_STYLE.bad
 
   function setMode(mode) {
     if (dueDateLocked && mode === 'hours') return
@@ -278,15 +303,40 @@ export default function Goals() {
       setLogError('Link Board tasks to this goal, move one to In Progress, then log time.')
       return
     }
+    let duration = combineDuration(logForm.duration_hours, logForm.duration_minutes)
+    const body = {
+      task_id: Number(logForm.task_id),
+      notes: logForm.notes,
+      activity_date: logForm.activity_date,
+    }
+    if (isSleepLog) {
+      if (!logForm.sleep_start_time || !logForm.sleep_end_time) {
+        setLogError('Enter sleep start time and wake-up time.')
+        return
+      }
+      if (logForm.sleep_start_time === logForm.sleep_end_time) {
+        setLogError('Wake-up time must differ from sleep start time.')
+        return
+      }
+      duration = sleepDurationMinutes(logForm.sleep_start_time, logForm.sleep_end_time)
+      if (!duration || duration < 1) {
+        setLogError('Could not calculate sleep duration from those times.')
+        return
+      }
+      body.sleep_start_time = logForm.sleep_start_time
+      body.sleep_end_time = logForm.sleep_end_time
+    } else if (duration < 1) {
+      setLogError('Enter a duration of at least 1 minute.')
+      return
+    } else if (duration > 24 * 60) {
+      setLogError('Duration cannot exceed 24 hours.')
+      return
+    }
+    body.duration_minutes = duration
     setLogBusy(true)
     setLogError('')
     try {
-      await api.createActivity(token, {
-        task_id: Number(logForm.task_id),
-        notes: logForm.notes,
-        activity_date: logForm.activity_date,
-        duration_minutes: Number(logForm.duration_minutes),
-      })
+      await api.createActivity(token, body)
       closeLog()
       await load()
     } catch (err) {
@@ -582,33 +632,101 @@ export default function Goals() {
                             </select>
                           </label>
                         )}
-                        <div className="row-2">
-                          <label>
-                            Date
-                            <input
-                              type="date"
-                              value={logForm.activity_date}
-                              onChange={(e) =>
-                                setLogForm({ ...logForm, activity_date: e.target.value })
-                              }
-                              required
-                            />
-                          </label>
-                          <label>
-                            Duration (min)
-                            <input
-                              type="number"
-                              min={1}
-                              value={logForm.duration_minutes}
-                              onChange={(e) =>
-                                setLogForm({ ...logForm, duration_minutes: e.target.value })
-                              }
-                              required
-                            />
-                          </label>
-                        </div>
                         <label>
-                          Notes
+                          Date
+                          <input
+                            type="date"
+                            value={logForm.activity_date}
+                            onChange={(e) =>
+                              setLogForm({ ...logForm, activity_date: e.target.value })
+                            }
+                            required
+                          />
+                        </label>
+                        {!isSleepLog && (
+                          <div className="row-2">
+                            <label>
+                              Hours
+                              <input
+                                type="number"
+                                min={0}
+                                max={24}
+                                value={logForm.duration_hours}
+                                onChange={(e) =>
+                                  setLogForm({ ...logForm, duration_hours: e.target.value })
+                                }
+                                required
+                              />
+                            </label>
+                            <label>
+                              Minutes
+                              <input
+                                type="number"
+                                min={0}
+                                max={59}
+                                value={logForm.duration_minutes}
+                                onChange={(e) =>
+                                  setLogForm({ ...logForm, duration_minutes: e.target.value })
+                                }
+                                required
+                              />
+                            </label>
+                          </div>
+                        )}
+                        {isSleepLog && (
+                          <>
+                            <div className="row-2">
+                              <label>
+                                Sleep start
+                                <input
+                                  type="time"
+                                  value={logForm.sleep_start_time}
+                                  onChange={(e) =>
+                                    setLogForm({
+                                      ...logForm,
+                                      sleep_start_time: e.target.value,
+                                    })
+                                  }
+                                  required
+                                />
+                              </label>
+                              <label>
+                                Wake up
+                                <input
+                                  type="time"
+                                  value={logForm.sleep_end_time}
+                                  onChange={(e) =>
+                                    setLogForm({ ...logForm, sleep_end_time: e.target.value })
+                                  }
+                                  required
+                                />
+                              </label>
+                            </div>
+                            <p className="muted">
+                              Duration:{' '}
+                              <strong>
+                                {logSleepMinutes != null ? formatDuration(logSleepMinutes) : '—'}
+                              </strong>
+                              {logSleepQuality ? (
+                                <>
+                                  {' '}
+                                  · Quality:{' '}
+                                  <span
+                                    className="sleep-quality-badge"
+                                    style={{
+                                      background: logSleepStyle.bg,
+                                      color: logSleepStyle.fg,
+                                    }}
+                                  >
+                                    {SLEEP_QUALITY_LABEL[logSleepQuality]}
+                                  </span>
+                                </>
+                              ) : null}
+                            </p>
+                          </>
+                        )}
+                        <label>
+                          Notes{isSleepLog ? ' (optional)' : ''}
                           <textarea
                             rows={2}
                             value={logForm.notes}

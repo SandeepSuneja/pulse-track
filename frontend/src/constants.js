@@ -11,14 +11,14 @@ export const CATEGORIES = [
 ]
 
 export const CATEGORY_COLORS = {
-  health: { bg: 'rgba(52,211,153,0.16)', fg: '#6EE7B7' },
-  learning: { bg: 'rgba(34,211,238,0.16)', fg: '#67E8F9' },
-  work: { bg: 'rgba(56,189,248,0.16)', fg: '#7DD3FC' },
-  sleep: { bg: 'rgba(125,211,252,0.14)', fg: '#BAE6FD' },
-  entertainment: { bg: 'rgba(251,191,36,0.16)', fg: '#FCD34D' },
-  personal_technical_projects: { bg: 'rgba(14,165,233,0.18)', fg: '#38BDF8' },
-  ai_content_generation: { bg: 'rgba(244,114,182,0.16)', fg: '#F9A8D4' },
-  others: { bg: 'rgba(148,163,184,0.16)', fg: '#CBD5E1' },
+  health: { bg: 'rgba(16,185,129,0.28)', fg: '#34D399' },
+  learning: { bg: 'rgba(168,85,247,0.28)', fg: '#C084FC' },
+  work: { bg: 'rgba(37,99,235,0.30)', fg: '#60A5FA' },
+  sleep: { bg: 'rgba(251,113,133,0.28)', fg: '#FB7185' },
+  entertainment: { bg: 'rgba(245,158,11,0.28)', fg: '#FBBF24' },
+  personal_technical_projects: { bg: 'rgba(20,184,166,0.28)', fg: '#2DD4BF' },
+  ai_content_generation: { bg: 'rgba(236,72,153,0.28)', fg: '#F472B6' },
+  others: { bg: 'rgba(148,163,184,0.24)', fg: '#E2E8F0' },
 }
 
 export function categoryLabel(category) {
@@ -29,4 +29,9 @@ export function categoryLabel(category) {
 
 export function categoryColors(category) {
   return CATEGORY_COLORS[category] || CATEGORY_COLORS.others
+}
+
+/** Solid hex for charts (lines, pie slices, bars). */
+export function categoryChartColor(category) {
+  return categoryColors(category).fg
 }

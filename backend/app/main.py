@@ -99,6 +99,12 @@ def ensure_sqlite_schema() -> None:
 
         if "task_id" not in activity_cols:
             conn.execute(text("ALTER TABLE activities ADD COLUMN task_id INTEGER REFERENCES tasks(id)"))
+        if "sleep_start_time" not in activity_cols:
+            conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_start_time TIME"))
+        if "sleep_end_time" not in activity_cols:
+            conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_end_time TIME"))
+        if "sleep_quality" not in activity_cols:
+            conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_quality VARCHAR(20)"))
 
         # Normalize categories on activities if column still present
         if "category" in activity_cols:
@@ -182,12 +188,36 @@ def ensure_sqlite_schema() -> None:
         db.close()
 
 
+def ensure_activity_sleep_columns() -> None:
+    """Add sleep columns on Postgres (and any non-SQLite engine) if missing."""
+    with engine.begin() as conn:
+        cols = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'activities'"
+                )
+            ).fetchall()
+        }
+        if not cols:
+            return
+        if "sleep_start_time" not in cols:
+            conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_start_time TIME"))
+        if "sleep_end_time" not in cols:
+            conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_end_time TIME"))
+        if "sleep_quality" not in cols:
+            conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_quality VARCHAR(20)"))
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     settings = get_settings()
     Base.metadata.create_all(bind=engine)
     if settings.sqlalchemy_database_url.startswith("sqlite"):
         ensure_sqlite_schema()
+    else:
+        ensure_activity_sleep_columns()
     try:
         init_firebase(settings)
     except RuntimeError:

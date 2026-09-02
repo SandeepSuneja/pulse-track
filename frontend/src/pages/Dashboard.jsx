@@ -14,8 +14,7 @@ import {
 } from 'recharts'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
-
-const COLORS = ['#22D3EE', '#34D399', '#FBBF24', '#FB7185', '#38BDF8', '#8BA3C7']
+import { categoryChartColor, categoryLabel } from '../constants'
 
 function hours(mins) {
   return `${(mins / 60).toFixed(1)}h`
@@ -135,13 +134,21 @@ export default function Dashboard() {
                         innerRadius={55}
                         outerRadius={90}
                         paddingAngle={3}
-                        label={({ category }) => category}
+                        label={({ category }) => categoryLabel(category)}
                       >
-                        {data.category_breakdown.map((_, i) => (
-                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                        {data.category_breakdown.map((item) => (
+                          <Cell
+                            key={item.category}
+                            fill={categoryChartColor(item.category)}
+                          />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip
+                        formatter={(value, name) => [
+                          `${value} min`,
+                          categoryLabel(name),
+                        ]}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -175,7 +182,10 @@ export default function Dashboard() {
                         <div className="progress-track">
                           <div
                             className="progress-fill"
-                            style={{ width: `${Math.min(g.completion_pct, 100)}%` }}
+                            style={{
+                              width: `${Math.min(g.completion_pct, 100)}%`,
+                              background: categoryChartColor(g.category),
+                            }}
                           />
                         </div>
                       )}

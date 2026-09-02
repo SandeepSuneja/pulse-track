@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
@@ -91,6 +91,9 @@ class ActivityBase(BaseModel):
     notes: str = ""
     activity_date: date
     duration_minutes: int = Field(ge=1, le=24 * 60)
+    # Sleep category only — client may send; server recomputes duration + quality
+    sleep_start_time: Optional[time] = None
+    sleep_end_time: Optional[time] = None
 
 
 class ActivityCreate(ActivityBase):
@@ -101,6 +104,8 @@ class ActivityUpdate(BaseModel):
     notes: Optional[str] = None
     activity_date: Optional[date] = None
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
+    sleep_start_time: Optional[time] = None
+    sleep_end_time: Optional[time] = None
 
 
 class ActivityOut(BaseModel):
@@ -114,6 +119,9 @@ class ActivityOut(BaseModel):
     notes: str
     activity_date: date
     duration_minutes: int
+    sleep_start_time: Optional[time] = None
+    sleep_end_time: Optional[time] = None
+    sleep_quality: Optional[str] = None
     created_at: datetime
 
 
@@ -193,6 +201,14 @@ class TimeSeriesPoint(BaseModel):
     value: float
 
 
+class CategoryTimeSeriesPoint(BaseModel):
+    """One day of logged minutes, flattened for charts: date + category keys."""
+
+    model_config = ConfigDict(extra="allow")
+
+    date: date
+
+
 class CategoryBreakdown(BaseModel):
     category: str
     minutes: int
@@ -216,4 +232,5 @@ class AnalyticsSummary(BaseModel):
     category_breakdown: list[CategoryBreakdown]
     task_breakdown: list[TaskBreakdown] = []
     minutes_over_time: list[TimeSeriesPoint]
+    category_minutes_over_time: list[CategoryTimeSeriesPoint] = []
     goal_progress: list[dict]
