@@ -14,12 +14,23 @@ import CloseIcon from '@mui/icons-material/Close'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
 import { CATEGORIES, categoryLabel } from '../constants'
+import {
+  SLEEP_QUALITY_LABEL,
+  SLEEP_QUALITY_STYLE,
+  classifySleepQuality,
+  sleepDurationMinutes,
+  toTimeInputValue,
+} from '../sleep'
+import { combineDuration, formatDuration, splitDuration } from '../duration'
 
 const emptyForm = () => ({
   task_id: '',
   notes: '',
   activity_date: new Date().toISOString().slice(0, 10),
-  duration_minutes: 60,
+  duration_hours: 1,
+  duration_minutes: 0,
+  sleep_start_time: '23:00',
+  sleep_end_time: '06:30',
 })
 
 const emptyFilters = () => ({
@@ -30,6 +41,19 @@ const emptyFilters = () => ({
   end_date: '',
 })
 
+function SleepQualityBadge({ quality }) {
+  if (!quality) return null
+  const style = SLEEP_QUALITY_STYLE[quality] || SLEEP_QUALITY_STYLE.bad
+  return (
+    <span
+      className="sleep-quality-badge"
+      style={{ background: style.bg, color: style.fg }}
+    >
+      {SLEEP_QUALITY_LABEL[quality] || quality}
+    </span>
+  )
+}
+
 export default function Activities() {
   const { token } = useAuth()
   const [items, setItems] = useState([])
@@ -39,6 +63,7 @@ export default function Activities() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const [editingCategory, setEditingCategory] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -88,7 +113,9 @@ export default function Activities() {
       if (filters.start_date && item.activity_date < filters.start_date) return false
       if (filters.end_date && item.activity_date > filters.end_date) return false
       if (search) {
-        const haystack = `${item.title || ''} ${item.notes || ''} PT-${item.task_id || ''}`.toLowerCase()
+        const quality = item.sleep_quality || ''
+        const haystack =
+          `${item.title || ''} ${item.notes || ''} PT-${item.task_id || ''} ${quality}`.toLowerCase()
         if (!haystack.includes(search)) return false
       }
       return true
@@ -123,6 +150,7 @@ export default function Activities() {
   function openCreate() {
     setEditingId(null)
     setEditingTitle('')
+    setEditingCategory('')
     setForm({
       ...emptyForm(),
       task_id: defaultTaskId(),
@@ -134,11 +162,16 @@ export default function Activities() {
   function startEdit(item) {
     setEditingId(item.id)
     setEditingTitle(item.title || '')
+    setEditingCategory(item.category || '')
+    const parts = splitDuration(item.duration_minutes)
     setForm({
       task_id: item.task_id ? String(item.task_id) : '',
       notes: item.notes || '',
       activity_date: item.activity_date,
-      duration_minutes: item.duration_minutes,
+      duration_hours: parts.hours,
+      duration_minutes: parts.minutes,
+      sleep_start_time: toTimeInputValue(item.sleep_start_time) || '23:00',
+      sleep_end_time: toTimeInputValue(item.sleep_end_time) || '06:30',
     })
     setError('')
     setDialogOpen(true)
@@ -149,6 +182,7 @@ export default function Activities() {
     setDialogOpen(false)
     setEditingId(null)
     setEditingTitle('')
+    setEditingCategory('')
     setError('')
     setForm({
       ...emptyForm(),
@@ -156,32 +190,81 @@ export default function Activities() {
     })
   }
 
+  const selectedTask = tasks.find((t) => String(t.id) === String(form.task_id))
+  const formCategory = isEditing ? editingCategory : selectedTask?.category || ''
+  const isSleepForm = formCategory === 'sleep'
+  const sleepMinutes = isSleepForm
+    ? sleepDurationMinutes(form.sleep_start_time, form.sleep_end_time)
+    : null
+  const sleepQuality = isSleepForm
+    ? classifySleepQuality(form.sleep_start_time, form.sleep_end_time)
+    : null
+
   async function onSubmit(e) {
     e.preventDefault()
     if (!isEditing && !form.task_id) {
       setError('Move a task to In Progress on the Board, then log time here.')
       return
     }
+    if (isSleepForm) {
+      if (!form.sleep_start_time || !form.sleep_end_time) {
+        setError('Enter sleep start time and wake-up time.')
+        return
+      }
+      if (form.sleep_start_time === form.sleep_end_time) {
+        setError('Wake-up time must differ from sleep start time.')
+        return
+      }
+      if (!sleepMinutes || sleepMinutes < 1) {
+        setError('Could not calculate sleep duration from those times.')
+        return
+      }
+    } else {
+      const total = combineDuration(form.duration_hours, form.duration_minutes)
+      if (total < 1) {
+        setError('Enter a duration of at least 1 minute.')
+        return
+      }
+      if (total > 24 * 60) {
+        setError('Duration cannot exceed 24 hours.')
+        return
+      }
+    }
     setBusy(true)
     setError('')
     try {
       if (isEditing) {
-        await api.updateActivity(token, editingId, {
+        const body = {
           notes: form.notes,
           activity_date: form.activity_date,
-          duration_minutes: Number(form.duration_minutes),
-        })
+        }
+        if (isSleepForm) {
+          body.sleep_start_time = form.sleep_start_time
+          body.sleep_end_time = form.sleep_end_time
+          body.duration_minutes = sleepMinutes
+        } else {
+          body.duration_minutes = combineDuration(form.duration_hours, form.duration_minutes)
+        }
+        await api.updateActivity(token, editingId, body)
       } else {
-        await api.createActivity(token, {
+        const body = {
           task_id: Number(form.task_id),
           notes: form.notes,
           activity_date: form.activity_date,
-          duration_minutes: Number(form.duration_minutes),
-        })
+        }
+        if (isSleepForm) {
+          body.sleep_start_time = form.sleep_start_time
+          body.sleep_end_time = form.sleep_end_time
+          body.duration_minutes = sleepMinutes
+        } else {
+          body.duration_minutes = combineDuration(form.duration_hours, form.duration_minutes)
+        }
+        await api.createActivity(token, body)
       }
       setDialogOpen(false)
       setEditingId(null)
       setEditingTitle('')
+      setEditingCategory('')
       setForm({
         ...emptyForm(),
         task_id: isEditing ? defaultTaskId() : form.task_id,
@@ -201,8 +284,6 @@ export default function Activities() {
     }
     await load({ preserveForm: editingId != null && editingId !== id })
   }
-
-  const selectedTask = tasks.find((t) => String(t.id) === String(form.task_id))
 
   return (
     <div className="page">
@@ -224,7 +305,7 @@ export default function Activities() {
               {filteredItems.length === items.length
                 ? `${items.length} log${items.length === 1 ? '' : 's'}`
                 : `${filteredItems.length} of ${items.length} logs`}
-              {filteredItems.length > 0 ? ` · ${filteredMinutes} min` : ''}
+              {filteredItems.length > 0 ? ` · ${formatDuration(filteredMinutes)}` : ''}
             </p>
           </div>
           <div className="activities-logs-actions">
@@ -322,8 +403,23 @@ export default function Activities() {
                         <div className="table-secondary">PT-{item.task_id}</div>
                       ) : null}
                     </td>
-                    <td>{categoryLabel(item.category)}</td>
-                    <td className="num nowrap">{item.duration_minutes} min</td>
+                    <td>
+                      <div>{categoryLabel(item.category)}</div>
+                      {item.category === 'sleep' && item.sleep_quality ? (
+                        <div className="table-secondary" style={{ marginTop: 4 }}>
+                          <SleepQualityBadge quality={item.sleep_quality} />
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="num nowrap">
+                      {formatDuration(item.duration_minutes)}
+                      {item.category === 'sleep' && item.sleep_start_time && item.sleep_end_time ? (
+                        <div className="table-secondary">
+                          {toTimeInputValue(item.sleep_start_time)} →{' '}
+                          {toTimeInputValue(item.sleep_end_time)}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="notes-cell">{item.notes || '—'}</td>
                     <td className="actions">
                       <div className="table-actions">
@@ -446,33 +542,88 @@ export default function Activities() {
                   {selectedTask.activity_count}{' '}
                   {selectedTask.activity_count === 1 ? 'activity' : 'activities'}
                   {(selectedTask.logged_minutes || 0) > 0
-                    ? ` · ${selectedTask.logged_minutes} min logged`
+                    ? ` · ${formatDuration(selectedTask.logged_minutes)} logged`
                     : ''}
                 </p>
               )}
-              <div className="row-2">
-                <label>
-                  Date
-                  <input
-                    type="date"
-                    value={form.activity_date}
-                    onChange={(e) => setForm({ ...form, activity_date: e.target.value })}
-                    required
-                  />
-                </label>
-                <label>
-                  Duration (min)
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.duration_minutes}
-                    onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })}
-                    required
-                  />
-                </label>
-              </div>
               <label>
-                Notes
+                Date
+                <input
+                  type="date"
+                  value={form.activity_date}
+                  onChange={(e) => setForm({ ...form, activity_date: e.target.value })}
+                  required
+                />
+              </label>
+              {isSleepForm ? (
+                <>
+                  <div className="row-2">
+                    <label>
+                      Sleep start
+                      <input
+                        type="time"
+                        value={form.sleep_start_time}
+                        onChange={(e) =>
+                          setForm({ ...form, sleep_start_time: e.target.value })
+                        }
+                        required
+                      />
+                    </label>
+                    <label>
+                      Wake up
+                      <input
+                        type="time"
+                        value={form.sleep_end_time}
+                        onChange={(e) => setForm({ ...form, sleep_end_time: e.target.value })}
+                        required
+                      />
+                    </label>
+                  </div>
+                  <p className="muted">
+                    Duration:{' '}
+                    <strong>
+                      {sleepMinutes != null ? formatDuration(sleepMinutes) : '—'}
+                    </strong>
+                    {sleepQuality ? (
+                      <>
+                        {' '}
+                        · Quality: <SleepQualityBadge quality={sleepQuality} />
+                      </>
+                    ) : null}
+                  </p>
+                  <p className="muted" style={{ fontSize: '0.85rem' }}>
+                    Ideal: 11:00–11:30 PM → 6:00–6:30 AM · Normal: 11:30 PM–12:30 AM → 6:30–7:30
+                    AM · otherwise Bad
+                  </p>
+                </>
+              ) : (
+                <div className="row-2">
+                  <label>
+                    Hours
+                    <input
+                      type="number"
+                      min={0}
+                      max={24}
+                      value={form.duration_hours}
+                      onChange={(e) => setForm({ ...form, duration_hours: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Minutes
+                    <input
+                      type="number"
+                      min={0}
+                      max={59}
+                      value={form.duration_minutes}
+                      onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })}
+                      required
+                    />
+                  </label>
+                </div>
+              )}
+              <label>
+                Notes{isSleepForm ? ' (optional)' : ''}
                 <textarea
                   rows={3}
                   value={form.notes}

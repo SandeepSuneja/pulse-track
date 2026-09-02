@@ -12,7 +12,13 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import Activity, Goal, Task, User
 from app.routers.goals import _expire_overdue_goals
-from app.schemas import AnalyticsSummary, CategoryBreakdown, TaskBreakdown, TimeSeriesPoint
+from app.schemas import (
+    AnalyticsSummary,
+    CategoryBreakdown,
+    CategoryTimeSeriesPoint,
+    TaskBreakdown,
+    TimeSeriesPoint,
+)
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -60,10 +66,12 @@ def analytics_summary(
     by_category: dict[str, int] = defaultdict(int)
     by_task: dict[int | None, int] = defaultdict(int)
     by_day: dict[date, int] = defaultdict(int)
+    by_day_category: dict[date, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for a in activities:
         by_category[a.category] += a.duration_minutes
         by_task[a.task_id] += a.duration_minutes
         by_day[a.activity_date] += a.duration_minutes
+        by_day_category[a.activity_date][a.category] += a.duration_minutes
 
     category_breakdown = [
         CategoryBreakdown(
@@ -99,8 +107,17 @@ def analytics_summary(
             )
         )
 
+    active_categories = sorted(by_category.keys())
     minutes_over_time = [
         TimeSeriesPoint(date=d, value=float(by_day.get(d, 0)))
+        for d in _daterange(start_d, end_d)
+    ]
+    # Flat rows for Recharts: { date, sleep: 420, work: 60, ... }
+    category_minutes_over_time = [
+        CategoryTimeSeriesPoint(
+            date=d,
+            **{cat: float(by_day_category[d].get(cat, 0)) for cat in active_categories},
+        )
         for d in _daterange(start_d, end_d)
     ]
 
@@ -160,6 +177,7 @@ def analytics_summary(
         category_breakdown=category_breakdown,
         task_breakdown=task_breakdown,
         minutes_over_time=minutes_over_time,
+        category_minutes_over_time=category_minutes_over_time,
         goal_progress=goal_progress,
     )
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Optional
 
 from sqlalchemy import (
@@ -10,6 +10,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Time,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -85,6 +86,10 @@ class Activity(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     activity_date: Mapped[date] = mapped_column(Date, index=True)
     duration_minutes: Mapped[int] = mapped_column(Integer)
+    # Sleep logs only — overnight start/wake clock times and Ideal/Normal/Bad rating
+    sleep_start_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    sleep_end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    sleep_quality: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="activities")

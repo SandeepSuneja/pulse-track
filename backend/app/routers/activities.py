@@ -8,6 +8,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import Activity, Task, User
 from app.schemas import ActivityCreate, ActivityOut, ActivityUpdate
+from app.sleep import classify_sleep_quality, sleep_duration_minutes
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -28,8 +29,42 @@ def _activity_out(activity: Activity) -> ActivityOut:
         notes=activity.notes,
         activity_date=activity.activity_date,
         duration_minutes=activity.duration_minutes,
+        sleep_start_time=activity.sleep_start_time,
+        sleep_end_time=activity.sleep_end_time,
+        sleep_quality=activity.sleep_quality,
         created_at=activity.created_at,
     )
+
+
+def _apply_sleep_fields(
+    *,
+    category: str,
+    sleep_start_time,
+    sleep_end_time,
+    duration_minutes: Optional[int],
+) -> tuple[int, object, object, Optional[str]]:
+    """Return duration, start, end, quality. Enforces sleep rules for sleep category."""
+    if category == "sleep":
+        if sleep_start_time is None or sleep_end_time is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Sleep logs require sleep start time and wake-up time.",
+            )
+        if sleep_start_time == sleep_end_time:
+            raise HTTPException(
+                status_code=400,
+                detail="Wake-up time must differ from sleep start time.",
+            )
+        minutes = sleep_duration_minutes(sleep_start_time, sleep_end_time)
+        if minutes < 1 or minutes > 24 * 60:
+            raise HTTPException(
+                status_code=400,
+                detail="Sleep duration must be between 1 and 1440 minutes.",
+            )
+        quality = classify_sleep_quality(sleep_start_time, sleep_end_time)
+        return minutes, sleep_start_time, sleep_end_time, quality
+
+    return duration_minutes or 0, None, None, None
 
 
 @router.get("", response_model=list[ActivityOut])
@@ -80,6 +115,15 @@ def create_activity(
         )
 
     data = payload.model_dump()
+    duration, sleep_start, sleep_end, quality = _apply_sleep_fields(
+        category=task.category,
+        sleep_start_time=data.get("sleep_start_time"),
+        sleep_end_time=data.get("sleep_end_time"),
+        duration_minutes=data.get("duration_minutes"),
+    )
+    if task.category != "sleep" and (duration is None or duration < 1):
+        raise HTTPException(status_code=400, detail="Duration must be at least 1 minute.")
+
     activity = Activity(
         user_id=current_user.id,
         task_id=task.id,
@@ -87,7 +131,10 @@ def create_activity(
         category=task.category,
         notes=data["notes"],
         activity_date=data["activity_date"],
-        duration_minutes=data["duration_minutes"],
+        duration_minutes=duration,
+        sleep_start_time=sleep_start,
+        sleep_end_time=sleep_end,
+        sleep_quality=quality,
     )
     db.add(activity)
     db.commit()
@@ -128,7 +175,29 @@ def update_activity(
     )
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
-    for key, value in payload.model_dump(exclude_unset=True).items():
+
+    data = payload.model_dump(exclude_unset=True)
+    category = activity.task.category if activity.task is not None else activity.category
+
+    sleep_touched = "sleep_start_time" in data or "sleep_end_time" in data
+    if category == "sleep" or sleep_touched:
+        sleep_start = data.get("sleep_start_time", activity.sleep_start_time)
+        sleep_end = data.get("sleep_end_time", activity.sleep_end_time)
+        duration, sleep_start, sleep_end, quality = _apply_sleep_fields(
+            category=category,
+            sleep_start_time=sleep_start,
+            sleep_end_time=sleep_end,
+            duration_minutes=data.get("duration_minutes", activity.duration_minutes),
+        )
+        activity.duration_minutes = duration
+        activity.sleep_start_time = sleep_start
+        activity.sleep_end_time = sleep_end
+        activity.sleep_quality = quality
+        data.pop("duration_minutes", None)
+        data.pop("sleep_start_time", None)
+        data.pop("sleep_end_time", None)
+
+    for key, value in data.items():
         setattr(activity, key, value)
     db.add(activity)
     db.commit()

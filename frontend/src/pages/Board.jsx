@@ -23,6 +23,7 @@ import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
 import { CATEGORIES, categoryColors, categoryLabel } from '../constants'
+import { formatDuration } from '../duration'
 
 const TASK_SECTIONS = [
   { id: 'activities', label: 'Activities' },
@@ -876,7 +877,7 @@ export default function Board() {
                               borderRadius: '8px',
                             }}
                           >
-                            {log.duration_minutes} min
+                            {formatDuration(log.duration_minutes)}
                           </Typography>
                         </Box>
                       ))}
