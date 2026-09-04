@@ -13,7 +13,7 @@ Pulse Track is a personal workspace for planned work, time logs, goals, and prog
 | **Board** | Kanban tasks (To Do → In Progress → Done) |
 | **Activities** | Time logs against In Progress tasks |
 | **Goals** | Hour or due-date targets linked to Board tasks |
-| **Dashboard** | Period snapshot with stats and charts |
+| **Dashboard** | Period snapshot: stats, time/sleep charts, category mix, goal progress |
 | **Analytics** | Deeper time breakdown by category and task |
 | **Profile** | Display name, timezone, bio |
 
@@ -142,8 +142,8 @@ Log and review time against **In Progress** Board tasks. Matching category time 
 |---|---|
 | Date | Log date |
 | Task | Title + `PT-{id}` |
-| Category | From linked task |
-| Duration | Minutes |
+| Category | From linked task (color chip; sleep also shows Ideal/Normal/Bad quality) |
+| Duration | Minutes (or hours for long blocks) |
 | Notes | Truncated in table; full text in modal |
 | Actions | Edit, Delete |
 
@@ -164,8 +164,19 @@ Same form for create and edit.
 |---|---|---|
 | Task | Pick from In Progress tasks | Read-only (shows linked task) |
 | Date | Required | Editable |
-| Duration (min) | Required | Editable |
+| Duration | Hours + minutes for most categories | Editable |
+| Sleep start / wake | Required when task category is **Sleep** (duration is calculated) | Editable |
 | Notes | Optional | Editable |
+
+For **Sleep** tasks, the form shows computed duration and a live **Ideal / Normal / Bad** quality badge.
+
+**Sleep quality rules:**
+
+| Rating | Conditions |
+|---|---|
+| Ideal | Wake 6:00–6:30 AM and sleep ≥ 7 hours |
+| Normal | Wake 6:30–7:30 AM and sleep ≥ 7 hours |
+| Bad | Anything else (including under 7 hours) |
 
 On create, if the selected task already has logs, a hint shows prior count and minutes.
 
@@ -211,7 +222,7 @@ Each goal card shows:
 | Complete | Marks goal completed |
 | Delete | Removes goal |
 
-**Log time inline form:** only **In Progress** tasks linked to the goal (or same category if no tasks linked). Saves a new activity log.
+**Log time inline form:** only **In Progress** tasks linked to the goal (or same category if no tasks linked). Saves a new activity log. For Sleep tasks, uses sleep start/wake times and shows quality like Activities.
 
 ---
 
@@ -236,14 +247,19 @@ Links to Board, Activities, and Goals.
 | Categories | Count of categories with time |
 | Goals | Count of active goal targets |
 
-### Charts
+### Charts (two equal-height rows)
+
+Row 1:
 
 - **Time by day** — bar chart of minutes over the period
+- **Sleep by day** — bar chart of sleep hours; bar color = Ideal (green) / Normal (blue) / Bad (red); legend when data exists; empty state links to Activities
+
+Row 2:
+
 - **Category mix** — donut chart; empty state links to Activities
+- **Goal progress** — active goals with progress bars (actual / target minutes and %); empty state links to Goals; long lists scroll inside the panel
 
-### Goal progress
-
-List of active goals with progress bars (actual / target minutes and %). Empty state links to Goals.
+All four panels share the same fixed height so the layout stays even across periods and empty states.
 
 ---
 
@@ -319,9 +335,11 @@ The UI links related areas so users do not hunt for context:
 
 - Dark “orbital” theme — cyan accents, Syne + Space Grotesk fonts
 - **Panels** — bordered cards with subtle grid background
-- **Category colors** — consistent chips on Board and in lists
+- **Category colors** — consistent chips on Board and in lists (`frontend/src/constants.js`)
+- **Sleep quality colors** — Ideal green, Normal blue, Bad red on badges and Dashboard sleep bars
 - **Modals** — Board tasks and Activities use MUI dialogs; Goals uses inline expand for log time
 - **Motion** — page transitions and kanban card animations on Board
+- **Dashboard panels** — four chart/list panels share equal fixed height
 
 ---
 

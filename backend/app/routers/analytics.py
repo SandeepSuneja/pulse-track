@@ -16,6 +16,7 @@ from app.schemas import (
     AnalyticsSummary,
     CategoryBreakdown,
     CategoryTimeSeriesPoint,
+    SleepTimeSeriesPoint,
     TaskBreakdown,
     TimeSeriesPoint,
 )
@@ -67,11 +68,14 @@ def analytics_summary(
     by_task: dict[int | None, int] = defaultdict(int)
     by_day: dict[date, int] = defaultdict(int)
     by_day_category: dict[date, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    sleep_by_day: dict[date, list[Activity]] = defaultdict(list)
     for a in activities:
         by_category[a.category] += a.duration_minutes
         by_task[a.task_id] += a.duration_minutes
         by_day[a.activity_date] += a.duration_minutes
         by_day_category[a.activity_date][a.category] += a.duration_minutes
+        if a.category == "sleep":
+            sleep_by_day[a.activity_date].append(a)
 
     category_breakdown = [
         CategoryBreakdown(
@@ -120,6 +124,22 @@ def analytics_summary(
         )
         for d in _daterange(start_d, end_d)
     ]
+
+    sleep_over_time: list[SleepTimeSeriesPoint] = []
+    for d in _daterange(start_d, end_d):
+        logs = sleep_by_day.get(d, [])
+        if not logs:
+            sleep_over_time.append(SleepTimeSeriesPoint(date=d, minutes=0, quality=None))
+            continue
+        minutes = sum(a.duration_minutes for a in logs)
+        primary = max(logs, key=lambda a: (a.duration_minutes, a.id or 0))
+        sleep_over_time.append(
+            SleepTimeSeriesPoint(
+                date=d,
+                minutes=minutes,
+                quality=primary.sleep_quality,
+            )
+        )
 
     goals = (
         db.query(Goal)
@@ -178,6 +198,7 @@ def analytics_summary(
         task_breakdown=task_breakdown,
         minutes_over_time=minutes_over_time,
         category_minutes_over_time=category_minutes_over_time,
+        sleep_over_time=sleep_over_time,
         goal_progress=goal_progress,
     )
 

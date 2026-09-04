@@ -196,6 +196,58 @@ h2,
   align-items: start;
 }
 
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap);
+  align-items: stretch;
+}
+
+.dashboard-grid + .dashboard-grid {
+  margin-top: 1rem;
+}
+
+.dashboard-panel {
+  display: flex;
+  flex-direction: column;
+  height: 340px;
+  box-sizing: border-box;
+}
+
+.dashboard-panel > h2,
+.dashboard-panel > .panel-head-row {
+  flex: 0 0 auto;
+  min-height: 2rem;
+  margin: 0 0 0.5rem;
+}
+
+.dashboard-panel .panel-head-row {
+  margin-bottom: 0.5rem;
+}
+
+.dashboard-panel .chart-wrap {
+  flex: 1 1 auto;
+  height: 0;
+  min-height: 0;
+}
+
+.dashboard-panel .empty-state {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.dashboard-panel .goal-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 0;
+  overflow-y: auto;
+  align-content: start;
+}
+
 .row-2,
 .row-3 {
   display: grid;
@@ -489,6 +541,43 @@ button:not(.MuiButtonBase-root):disabled {
   font-weight: 700;
   letter-spacing: 0.02em;
   vertical-align: middle;
+}
+
+.panel-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.panel-head-row h2 {
+  margin: 0;
+}
+
+.sleep-quality-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.sleep-quality-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sleep-quality-swatch {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
 .table-actions {
@@ -1014,7 +1103,8 @@ button:not(.MuiButtonBase-root):disabled {
 @media (max-width: 960px) {
   .stat-row,
   .quick-actions,
-  .grid-2 {
+  .grid-2,
+  .dashboard-grid {
     grid-template-columns: 1fr;
   }
 

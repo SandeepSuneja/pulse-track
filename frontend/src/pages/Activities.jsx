@@ -592,8 +592,8 @@ export default function Activities() {
                     ) : null}
                   </p>
                   <p className="muted" style={{ fontSize: '0.85rem' }}>
-                    Ideal: 11:00–11:30 PM → 6:00–6:30 AM · Normal: 11:30 PM–12:30 AM → 6:30–7:30
-                    AM · otherwise Bad
+                    Ideal: wake 6:00–6:30 AM · Normal: wake 6:30–7:30 AM · both need ≥ 7 hrs
+                    sleep · otherwise Bad
                   </p>
                 </>
               ) : (

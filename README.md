@@ -11,11 +11,13 @@ React (Vite) frontend + FastAPI/SQLite backend, with Firebase Authentication.
 | **Board** | Kanban tasks: To Do → In Progress → Done. Optional start/due dates, category, and link to a goal. |
 | **Activities** | Time logs against **In Progress** tasks. Edit or delete logs. Task title on logs stays in sync when you rename the task. |
 | **Goals** | Hours target (daily/weekly/monthly) **or** a due date (not both). Optional start date. Link one or more Board tasks. **Complete** an active goal. Missed due dates become **Failed** and cannot be edited. Due date cannot be changed once set. |
-| **Dashboard** | Period snapshot: logged time, activity count, category mix, and active goal progress. |
+| **Dashboard** | Period snapshot: logged time, activity count, **time by day**, **sleep by day** (quality-colored), category mix, and active goal progress. |
 | **Analytics** | Day / week / month / year. Minutes over time, breakdown **by category** and **by task**. |
 | **Profile** | Display name, bio, timezone. |
 
 Categories: health, learning, work, sleep, entertainment, personal technical projects, AI content generation, others.
+
+**Sleep logs** use bedtime and wake-up times. Quality is **Ideal** (wake 6:00–6:30 AM and ≥ 7 hours), **Normal** (wake 6:30–7:30 AM and ≥ 7 hours), or **Bad** otherwise.
 
 ## How the pieces connect
 
@@ -117,4 +119,4 @@ Allow popups for localhost if Google sign-in is blocked.
 | Goals | `GET/POST /api/goals`, `PATCH/DELETE /api/goals/{id}` |
 | Analytics | `GET /api/analytics/summary?period=day\|week\|month\|year` |
 
-Analytics returns total minutes, category breakdown, **task breakdown**, time series, and active goal progress.
+Analytics returns total minutes, category breakdown, **task breakdown**, time series, **sleep over time** (minutes + quality per day), and active goal progress.

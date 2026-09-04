@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import time
 
+MIN_GOOD_SLEEP_MINUTES = 7 * 60
+
 
 def _minutes(t: time) -> int:
     return t.hour * 60 + t.minute
@@ -22,29 +24,23 @@ def _in_inclusive(m: int, lo: int, hi: int) -> bool:
     return lo <= m <= hi
 
 
-def _in_overnight_window(m: int, start: int, end: int) -> bool:
-    """True if m is in [start, 24h) ∪ [0, end] (e.g. 23:30–00:30)."""
-    return m >= start or m <= end
-
-
 def classify_sleep_quality(start: time, end: time) -> str:
     """
-    Ideal: bedtime 23:00–23:30 and wake 06:00–06:30 next day.
-    Normal: bedtime 23:30–00:30 and wake 06:30–07:30 next day.
+    Ideal: wake 06:00–06:30 and duration ≥ 7 hours.
+    Normal: wake 06:30–07:30 and duration ≥ 7 hours.
     Bad: anything else.
-    Ideal is checked first when windows overlap (e.g. exactly 23:30 / 06:30).
+    Ideal is checked first when windows overlap (e.g. exactly 06:30).
     """
-    start_m = _minutes(start)
+    duration = sleep_duration_minutes(start, end)
+    if duration < MIN_GOOD_SLEEP_MINUTES:
+        return "bad"
+
     end_m = _minutes(end)
 
-    ideal_start = _in_inclusive(start_m, 23 * 60, 23 * 60 + 30)
-    ideal_end = _in_inclusive(end_m, 6 * 60, 6 * 60 + 30)
-    if ideal_start and ideal_end:
+    if _in_inclusive(end_m, 6 * 60, 6 * 60 + 30):
         return "ideal"
 
-    normal_start = _in_overnight_window(start_m, 23 * 60 + 30, 30)
-    normal_end = _in_inclusive(end_m, 6 * 60 + 30, 7 * 60 + 30)
-    if normal_start and normal_end:
+    if _in_inclusive(end_m, 6 * 60 + 30, 7 * 60 + 30):
         return "normal"
 
     return "bad"
