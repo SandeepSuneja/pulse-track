@@ -223,6 +223,14 @@ class TaskBreakdown(BaseModel):
     percentage: float
 
 
+class SleepTimeSeriesPoint(BaseModel):
+    """Day-wise sleep duration and Ideal/Normal/Bad quality for charts."""
+
+    date: date
+    minutes: int
+    quality: str | None = None
+
+
 class AnalyticsSummary(BaseModel):
     period: str
     start_date: date
@@ -233,4 +241,5 @@ class AnalyticsSummary(BaseModel):
     task_breakdown: list[TaskBreakdown] = []
     minutes_over_time: list[TimeSeriesPoint]
     category_minutes_over_time: list[CategoryTimeSeriesPoint] = []
+    sleep_over_time: list[SleepTimeSeriesPoint] = []
     goal_progress: list[dict]

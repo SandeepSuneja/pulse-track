@@ -57,16 +57,30 @@ Use these exact string values in API payloads and UI pickers.
 
 ### Task / goal category
 
-| ID | Display label |
-|---|---|
-| `health` | Health |
-| `learning` | Learning |
-| `work` | Work |
-| `sleep` | Sleep |
-| `entertainment` | Entertainment |
-| `personal_technical_projects` | Personal Technical Projects |
-| `ai_content_generation` | AI Content Generation |
-| `others` | Others |
+| ID | Display label | Chart / chip color (fg) |
+|---|---|---|
+| `health` | Health | `#34D399` |
+| `learning` | Learning | `#C084FC` |
+| `work` | Work | `#60A5FA` |
+| `sleep` | Sleep | `#FB7185` |
+| `entertainment` | Entertainment | `#838921` |
+| `personal_technical_projects` | Personal Technical Projects | `#FB923C` |
+| `ai_content_generation` | AI Content Generation | `#450C3F` (bg tint `#FFDADA`) |
+| `others` | Others | `#E2E8F0` |
+
+Source of truth for web: `frontend/src/constants.js` (`CATEGORY_COLORS`).
+
+### Sleep quality (sleep category logs only)
+
+Computed from sleep start + wake times (duration spans midnight when needed). Stored on the activity as `sleep_quality`.
+
+| Value | Label | Rules |
+|---|---|---|
+| `ideal` | Ideal | Wake **06:00–06:30** and duration **≥ 7 hours** |
+| `normal` | Normal | Wake **06:30–07:30** and duration **≥ 7 hours** |
+| `bad` | Bad | Anything else (including under 7 hours) |
+
+At exactly 06:30 with ≥ 7 hours, **Ideal** wins. Shared logic: `backend/app/sleep.py` and `frontend/src/sleep.js`.
 
 ### Goal period
 
@@ -276,7 +290,7 @@ Combine server params for efficient mobile pagination later; current API returns
 |---|---|
 | Date | `activity_date` |
 | Task | `title` + `PT-{task_id}` |
-| Category | `category` (display label) |
+| Category | `category` (display label); for sleep also show `sleep_quality` badge |
 | Duration | `duration_minutes` + “min” |
 | Notes | `notes` or “—” |
 | Actions | Edit, Delete |
@@ -287,12 +301,16 @@ Combine server params for efficient mobile pagination later; current API returns
 |---|---|---|---|---|
 | Task | Picker | **Read-only** | `task_id` | Create: only `in_progress` tasks |
 | Date | Required | Editable | `activity_date` | ISO date |
-| Duration | Required | Editable | `duration_minutes` | 1–1440 |
+| Duration | Required (non-sleep) | Editable | `duration_minutes` | 1–1440; for sleep, derived from start/wake |
+| Sleep start | Required when category is `sleep` | Editable | `sleep_start_time` | `HH:MM` |
+| Wake up | Required when category is `sleep` | Editable | `sleep_end_time` | Must differ from start; overnight OK |
 | Notes | Optional | Editable | `notes` | Text |
+
+**Sleep create/edit:** send `sleep_start_time` + `sleep_end_time`; backend sets `duration_minutes` and `sleep_quality`. Show live Ideal/Normal/Bad preview using the sleep quality rules above.
 
 **On create:** Backend copies `title` and `category` from the task. Response `title`/`category` always reflect **live task** data (renames sync).
 
-**On edit:** Only `notes`, `activity_date`, `duration_minutes` can change — **not** `task_id`.
+**On edit:** Only `notes`, `activity_date`, `duration_minutes` (or sleep times) can change — **not** `task_id`.
 
 **Create error (400):** `"Only In Progress tasks can receive activity logs..."` if task is not `in_progress`.
 
@@ -329,11 +347,16 @@ DELETE /api/activities/{id}
   "notes": "Morning session",
   "activity_date": "2026-08-23",
   "duration_minutes": 90,
+  "sleep_start_time": null,
+  "sleep_end_time": null,
+  "sleep_quality": null,
   "created_at": "2026-08-23T10:00:00Z"
 }
 ```
 
-**Create:**
+Sleep example fields: `"sleep_start_time": "23:00:00"`, `"sleep_end_time": "06:30:00"`, `"sleep_quality": "ideal"`.
+
+**Create (non-sleep):**
 
 ```json
 POST /api/activities
@@ -341,6 +364,19 @@ POST /api/activities
   "task_id": 42,
   "activity_date": "2026-08-23",
   "duration_minutes": 60,
+  "notes": ""
+}
+```
+
+**Create (sleep):**
+
+```json
+POST /api/activities
+{
+  "task_id": 55,
+  "activity_date": "2026-08-23",
+  "sleep_start_time": "23:00",
+  "sleep_end_time": "06:30",
   "notes": ""
 }
 ```
@@ -362,6 +398,7 @@ PATCH /api/activities/10
 - Show empty state when no In Progress tasks with link to Board.
 - List: use `FlatList` with sticky filter header.
 - Confirm before delete.
+- For sleep: time pickers for start/wake; show computed duration + quality badge.
 
 ---
 
@@ -518,8 +555,10 @@ POST /api/goals
 1. **Header** — “Your pulse today” + **period toggle**: `day` | `week` | `month` | `year`
 2. **Quick actions** — deep links to Board, Activities, Goals
 3. **Stat tiles** (4)
-4. **Charts** — time by day (bar), category mix (pie)
-5. **Goal progress** list with bars
+4. **Charts row 1** — Time by day (bar) | Sleep by day (quality-colored bars)
+5. **Charts row 2** — Category mix (pie) | Goal progress list
+
+All four chart/list panels use the **same fixed height** on web (empty states and long goal lists do not change panel height).
 
 ### 7.2 Period → date range (server-side)
 
@@ -548,6 +587,15 @@ Subtitle on logged time: `start_date → end_date`.
 - Data: `minutes_over_time[]` — `{ date, value }` for every day in range (zeros included).
 - Chart: bar chart, Y = minutes.
 
+**Sleep by day**
+
+- Data: `sleep_over_time[]` — `{ date, minutes, quality }` for every day in range.
+  - `minutes`: sum of sleep-category activity minutes that day (0 if none).
+  - `quality`: Ideal/Normal/Bad from the longest sleep log that day, or `null` if no sleep.
+- Chart: bar chart, Y = hours (`minutes / 60`).
+- Bar colors: Ideal `#6EE7B7`, Normal `#7DD3FC`, Bad `#FCA5A5` (see `SLEEP_QUALITY_CHART_COLOR` in `frontend/src/sleep.js`).
+- Empty period → prompt to log sleep.
+
 **Category mix**
 
 - Data: `category_breakdown[]` — `{ category, minutes, percentage }`.
@@ -571,6 +619,7 @@ Subtitle on logged time: `start_date → end_date`.
 
 - Show progress bar when `target_minutes > 0`.
 - Deadline goals may show `target_minutes: 0` — display logged minutes only.
+- Scroll inside the panel if many goals.
 
 ### 7.5 API
 
@@ -764,11 +813,12 @@ Use this when implementing each screen:
 - [ ] **Board** — 3 columns, drag/status change, CRUD, goal link, activity tab on edit, overdue styling
 - [ ] **Activities** — filters, table, modal CRUD, In Progress-only create, edit without task change
 - [ ] **Goals** — hours vs due modes, task linking, progress bar, complete, auto-fail display, inline log
-- [ ] **Dashboard** — 4 periods, 4 stats, 2 charts, goal list
+- [ ] **Dashboard** — 4 periods, 4 stats, time + sleep charts, category mix, goal list (equal-height panels)
 - [ ] **Analytics** — 4 periods, line/bar time chart, category pie, task bars
 - [ ] **Profile** — read email, edit name/timezone/bio
 - [ ] **Auth** — Firebase Google + email, Bearer token on all `/api/*`
 - [ ] **Categories** — all 8 values with labels and colors
+- [ ] **Sleep quality** — Ideal/Normal/Bad from wake window + ≥ 7 hours; sleep_over_time on analytics
 - [ ] **PT-{id}** — consistent task ticket display
 
 ---
@@ -780,6 +830,8 @@ Use this when implementing each screen:
 | `frontend/src/pages/*.jsx` | Web UI reference implementations |
 | `frontend/src/api.js` | Exact API paths used by web |
 | `frontend/src/constants.js` | Categories and colors |
+| `frontend/src/sleep.js` | Sleep duration + quality classification (mirrors backend) |
+| `backend/app/sleep.py` | Sleep duration + quality rules |
 | `backend/app/schemas.py` | Request/response validation |
 | `backend/app/routers/*.py` | Business rules and endpoints |
 | `docs/UI-ABILITIES.md` | Short feature overview |

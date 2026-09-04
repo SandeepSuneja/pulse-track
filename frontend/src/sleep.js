@@ -1,5 +1,7 @@
 /** Sleep duration + Ideal / Normal / Bad classification (mirrors backend/app/sleep.py). */
 
+const MIN_GOOD_SLEEP_MINUTES = 7 * 60
+
 function toMinutes(hhmm) {
   if (!hhmm || typeof hhmm !== 'string') return null
   const [h, m] = hhmm.split(':').map(Number)
@@ -26,27 +28,21 @@ function inInclusive(m, lo, hi) {
   return m >= lo && m <= hi
 }
 
-function inOvernightWindow(m, start, end) {
-  return m >= start || m <= end
-}
-
 /**
- * Ideal: bedtime 23:00–23:30 and wake 06:00–06:30.
- * Normal: bedtime 23:30–00:30 and wake 06:30–07:30.
- * Bad: anything else. Ideal wins when windows overlap.
+ * Ideal: wake 06:00–06:30 and duration ≥ 7 hours.
+ * Normal: wake 06:30–07:30 and duration ≥ 7 hours.
+ * Bad: anything else. Ideal wins when windows overlap (e.g. exactly 06:30).
  */
 export function classifySleepQuality(startHhmm, endHhmm) {
   const start = toMinutes(startHhmm)
   const end = toMinutes(endHhmm)
   if (start == null || end == null) return null
 
-  const idealStart = inInclusive(start, 23 * 60, 23 * 60 + 30)
-  const idealEnd = inInclusive(end, 6 * 60, 6 * 60 + 30)
-  if (idealStart && idealEnd) return 'ideal'
+  const duration = sleepDurationMinutes(startHhmm, endHhmm)
+  if (duration == null || duration < MIN_GOOD_SLEEP_MINUTES) return 'bad'
 
-  const normalStart = inOvernightWindow(start, 23 * 60 + 30, 30)
-  const normalEnd = inInclusive(end, 6 * 60 + 30, 7 * 60 + 30)
-  if (normalStart && normalEnd) return 'normal'
+  if (inInclusive(end, 6 * 60, 6 * 60 + 30)) return 'ideal'
+  if (inInclusive(end, 6 * 60 + 30, 7 * 60 + 30)) return 'normal'
 
   return 'bad'
 }
@@ -61,4 +57,15 @@ export const SLEEP_QUALITY_STYLE = {
   ideal: { bg: 'rgba(52,211,153,0.16)', fg: '#6EE7B7' },
   normal: { bg: 'rgba(56,189,248,0.16)', fg: '#7DD3FC' },
   bad: { bg: 'rgba(248,113,113,0.16)', fg: '#FCA5A5' },
+}
+
+/** Solid fills for sleep quality bars. */
+export const SLEEP_QUALITY_CHART_COLOR = {
+  ideal: '#6EE7B7',
+  normal: '#7DD3FC',
+  bad: '#FCA5A5',
+}
+
+export function sleepQualityChartColor(quality) {
+  return SLEEP_QUALITY_CHART_COLOR[quality] || 'rgba(148,163,184,0.35)'
 }

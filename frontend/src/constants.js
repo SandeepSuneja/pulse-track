@@ -15,9 +15,9 @@ export const CATEGORY_COLORS = {
   learning: { bg: 'rgba(168,85,247,0.28)', fg: '#C084FC' },
   work: { bg: 'rgba(37,99,235,0.30)', fg: '#60A5FA' },
   sleep: { bg: 'rgba(251,113,133,0.28)', fg: '#FB7185' },
-  entertainment: { bg: 'rgba(254,242,160,0.28)', fg: '#FEF2A0' },
+  entertainment: { bg: 'rgba(254,242,160,0.28)', fg: '#838921' },
   personal_technical_projects: { bg: 'rgba(249,115,22,0.28)', fg: '#FB923C' },
-  ai_content_generation: { bg: 'rgba(236,72,153,0.28)', fg: '#F472B6' },
+  ai_content_generation: { bg: 'rgba(255,218,218,0.28)', fg: '#450C3F' },
   others: { bg: 'rgba(148,163,184,0.24)', fg: '#E2E8F0' },
 }
 
