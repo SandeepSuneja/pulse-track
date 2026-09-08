@@ -111,6 +111,42 @@ h2,
   animation: rise-in 0.32s var(--ease);
 }
 
+.api-docs-page {
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 88px);
+}
+
+.api-docs-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.api-docs-links .action-link {
+  min-width: 9.5rem;
+}
+
+.api-docs-frame-wrap {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  margin-bottom: 0;
+}
+
+.api-docs-frame {
+  width: 100%;
+  min-height: min(72vh, 820px);
+  height: calc(100vh - 220px);
+  border: 0;
+  background: #fff;
+  border-radius: inherit;
+}
+
 .page-head {
   display: flex;
   justify-content: space-between;

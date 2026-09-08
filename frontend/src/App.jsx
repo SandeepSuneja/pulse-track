@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext'
 import Layout from './components/Layout'
 import Activities from './pages/Activities'
 import Analytics from './pages/Analytics'
+import ApiDocs from './pages/ApiDocs'
 import Board from './pages/Board'
 import Dashboard from './pages/Dashboard'
 import Goals from './pages/Goals'
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="activities" element={<Activities />} />
         <Route path="goals" element={<Goals />} />
         <Route path="analytics" element={<Analytics />} />
+        <Route path="api-docs" element={<ApiDocs />} />
         <Route path="profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />

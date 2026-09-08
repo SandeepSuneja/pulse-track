@@ -1,15 +1,29 @@
 # Deploy Pulse Track on AWS
 
-Web SPA on S3 + CloudFront, FastAPI on App Runner, PostgreSQL on RDS. The same HTTPS API and database are what a later mobile app will use.
+Web SPA on S3 + CloudFront, FastAPI on App Runner/ECS, PostgreSQL on RDS. The same HTTPS API and database are used by the **web app and the Flutter mobile client** (`mobile/`).
 
 Region used throughout: **ap-south-1** (Mumbai). Swap the region in every command if you use another.
+
+For product-level architecture (auth sequence, domain model, local vs AWS), see **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
+
+```mermaid
+flowchart LR
+  Browser --> CF[CloudFront]
+  CF --> S3[S3 React build]
+  Browser -->|Bearer token| API[App Runner / ECS FastAPI]
+  Mobile[Flutter mobile] -->|Bearer token| API
+  API --> RDS[(RDS PostgreSQL)]
+  API --> FB[Firebase Admin]
+  Browser --> FB
+  Mobile --> FB
+```
 
 ```
 Browser ──► CloudFront ──► S3 (React build)
                 │
                 │  Authorization: Bearer <Firebase ID token>
                 ▼
-Mobile ──────► App Runner (FastAPI :8000) ──► RDS PostgreSQL
+Mobile ──────► App Runner / ECS (FastAPI :8000) ──► RDS PostgreSQL
                 │
                 └── Firebase Admin (verify token)
 ```
@@ -185,7 +199,7 @@ When the service is running, copy the default URL:
 https://xxxx.ap-south-1.awsapprunner.com
 ```
 
-That origin is the API base URL for the **web app and the future mobile app**.
+That origin is the API base URL for the **web app** (`VITE_API_URL`) and the **Flutter mobile app** (auto-resolved deployed URL / `API_BASE_URL` / `DEPLOYED_API_BASE_URL` — see [MOBILE.md](./MOBILE.md) and [mobile/README.md](../mobile/README.md)).
 
 ```powershell
 $ApiUrl = "https://xxxx.ap-south-1.awsapprunner.com"
@@ -324,7 +338,7 @@ No extra AWS services are required for a native app.
 | Auth | `Authorization: Bearer <Firebase ID token>` from the **same** Firebase project |
 | CORS | Ignored by native iOS/Android. Add a webview origin to `CORS_ORIGINS` only if you ship one |
 
-Keep `DEV_SKIP_AUTH=false`. Ship the API URL as a mobile config value (not hardcoded to localhost).
+Keep `DEV_SKIP_AUTH=false`. The Flutter app probes localhost then falls back to the deployed HTTPS API; override with `--dart-define=API_BASE_URL=…` or `DEPLOYED_API_BASE_URL=…` when the App Runner / ECS URL changes (see [mobile/README.md](../mobile/README.md)).
 
 Optional later (not required for first deploy): custom domains `api.yourdomain.com` and `app.yourdomain.com` with ACM certificates and Route 53.
 
