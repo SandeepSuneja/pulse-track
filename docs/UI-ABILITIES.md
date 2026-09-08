@@ -1,6 +1,8 @@
 # Pulse Track — UI Abilities
 
-What users can do in the web app, organized by screen and interaction. This document describes **UI capabilities only** (not API or deployment).
+What users can do in the **web app**, organized by screen and interaction. This document describes **UI capabilities only** (not API or deployment).
+
+The **Flutter mobile app** implements the same product abilities with a native layout. See [MOBILE.md](./MOBILE.md) for mobile screens, [MOBILE-UI-SPEC.md](./MOBILE-UI-SPEC.md) for API contracts, and [ARCHITECTURE.md](./ARCHITECTURE.md) for how web, mobile, and the backend connect.
 
 ---
 
@@ -15,11 +17,14 @@ Pulse Track is a personal workspace for planned work, time logs, goals, and prog
 | **Goals** | Hour or due-date targets linked to Board tasks |
 | **Dashboard** | Period snapshot: stats, time/sleep charts, category mix, goal progress |
 | **Analytics** | Deeper time breakdown by category and task |
+| **API Docs** | Embedded Swagger UI for the REST API |
 | **Profile** | Display name, timezone, bio |
 
 **Categories** (used on tasks, logs, and goals): Health, Learning, Work, Sleep, Entertainment, Personal Technical Projects, AI Content Generation, Others.
 
 **Typical flow:** create tasks on the Board → move to In Progress → log time in Activities → track progress on Goals, Dashboard, and Analytics.
+
+**System diagram:** both the browser app and the Flutter client authenticate with Firebase and call the same FastAPI — see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ---
 
@@ -29,11 +34,11 @@ Every main page shares the same frame.
 
 ### Sidebar
 
-- Navigate to **Board**, **Dashboard**, **Activities**, **Goals**, **Analytics**, **Profile**
+- Navigate to **Board**, **Dashboard**, **Activities**, **Goals**, **Analytics**, **API Docs**, **Profile**
 - See signed-in user (avatar + name/email)
 - **Sign out**
 
-On mobile, the sidebar opens from a hamburger menu in the top bar.
+On narrow **web** viewports, the sidebar opens from a hamburger menu in the top bar. The **Flutter** app uses bottom tabs instead (see [MOBILE.md](./MOBILE.md)).
 
 ### Top bar
 
@@ -291,6 +296,16 @@ Empty states when no data exists for the selected period.
 
 ---
 
+## API Docs (`/api-docs`)
+
+Interactive **Swagger UI** for the backend REST API (embedded from `{VITE_API_URL}/docs`).
+
+- Links to open Swagger, ReDoc, and OpenAPI JSON in a new tab
+- Use **Authorize** with a Firebase ID token, or `dev:<uid>` when `DEV_SKIP_AUTH=true`
+- Direct backend URLs: `/docs`, `/redoc`, `/openapi.json`
+
+---
+
 ## Profile (`/profile`)
 
 Manage app profile (separate from Firebase account email).
@@ -347,10 +362,10 @@ The UI links related areas so users do not hunt for context:
 
 - No in-app user management or admin panel
 - No bulk import/export from the UI
-- No mobile-native app (web SPA only; API is shared for future mobile)
+- No offline-first sync (web and mobile require a reachable API)
 - Task status cannot be changed from Activities — use the Board
 - Failed goals cannot be reopened or edited from the UI
 
-For **mobile app development** (API payloads, business rules, screen-by-screen spec), see [MOBILE-UI-SPEC.md](./MOBILE-UI-SPEC.md).
+The **Flutter mobile app** ships in [`mobile/`](../mobile/README.md). Product overview: [MOBILE.md](./MOBILE.md). API / field contracts: [MOBILE-UI-SPEC.md](./MOBILE-UI-SPEC.md).
 
 For architecture and API details, see [README.md](../README.md). For AWS deployment, see [DEPLOY-AWS.md](./DEPLOY-AWS.md).

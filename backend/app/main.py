@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from sqlalchemy import text
 
 from app.auth import init_firebase
@@ -9,6 +10,40 @@ from app.config import get_settings
 from app.database import Base, SessionLocal, engine
 from app.models import Activity, Task
 from app.routers import activities, analytics, goals, tasks, users
+
+
+API_DESCRIPTION = """
+Personal activity tracking, goals, and analytics for Pulse Track.
+
+## Authentication
+
+Protected routes expect:
+
+```http
+Authorization: Bearer <Firebase ID token>
+```
+
+Use the **Authorize** button in Swagger UI and paste your token (without the `Bearer ` prefix).
+
+**Local only:** if the API is running with `DEV_SKIP_AUTH=true`, you can use a token shaped as `dev:<uid>` (example: `dev:demo`).
+
+## Interactive docs
+
+| Page | Path |
+|---|---|
+| Swagger UI | `/docs` |
+| ReDoc | `/redoc` |
+| OpenAPI JSON | `/openapi.json` |
+"""
+
+OPENAPI_TAGS = [
+    {"name": "users", "description": "Current user profile"},
+    {"name": "tasks", "description": "Board tasks (Kanban)"},
+    {"name": "activities", "description": "Time logs, including sleep start/wake"},
+    {"name": "goals", "description": "Hour or due-date goals linked to tasks"},
+    {"name": "analytics", "description": "Period summaries, charts, sleep-by-day"},
+    {"name": "health", "description": "Liveness check (no auth)"},
+]
 
 
 def ensure_sqlite_schema() -> None:
@@ -228,9 +263,18 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Pulse Track API",
-    description="Personal activity tracking, goals, and analytics.",
+    description=API_DESCRIPTION,
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+        "displayRequestDuration": True,
+        "filter": True,
+        "tryItOutEnabled": True,
+    },
 )
 
 settings = get_settings()
@@ -249,6 +293,36 @@ app.include_router(goals.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 
 
-@app.get("/api/health")
+@app.get("/api/health", tags=["health"], summary="Health check")
 def health():
     return {"status": "ok", "service": "pulse-track"}
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=OPENAPI_TAGS,
+    )
+    components = openapi_schema.setdefault("components", {})
+    schemes = components.setdefault("securitySchemes", {})
+    schemes["HTTPBearer"] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": (
+            "Firebase ID token from the client SDK. "
+            "Local DEV_SKIP_AUTH mode also accepts `dev:<uid>`."
+        ),
+    }
+    # Default security for Try it out; /api/health remains callable without a token.
+    openapi_schema["security"] = [{"HTTPBearer": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi

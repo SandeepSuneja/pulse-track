@@ -2,71 +2,101 @@
 
 Personal workspace for planned work, time logs, goals, and progress charts.
 
-React (Vite) frontend + FastAPI/SQLite backend, with Firebase Authentication.
+**React (Vite) web app** + **Flutter mobile app** + **FastAPI** backend, with **Firebase Authentication**. Web and mobile share one API and one user data store.
 
 ## What it does
 
 | Area | What you get |
 |---|---|
-| **Board** | Kanban tasks: To Do → In Progress → Done. Optional start/due dates, category, and link to a goal. |
-| **Activities** | Time logs against **In Progress** tasks. Edit or delete logs. Task title on logs stays in sync when you rename the task. |
-| **Goals** | Hours target (daily/weekly/monthly) **or** a due date (not both). Optional start date. Link one or more Board tasks. **Complete** an active goal. Missed due dates become **Failed** and cannot be edited. Due date cannot be changed once set. |
-| **Dashboard** | Period snapshot: logged time, activity count, **time by day**, **sleep by day** (quality-colored), category mix, and active goal progress. |
-| **Analytics** | Day / week / month / year. Minutes over time, breakdown **by category** and **by task**. |
-| **Profile** | Display name, bio, timezone. |
+| **Board** | Kanban / task list: To Do → In Progress → Done. Optional start/due dates, category, and link to a goal. |
+| **Activities** | Time logs against **In Progress** tasks. Edit or delete logs. Sleep logs with Ideal / Normal / Bad quality. |
+| **Goals** | Hours target (daily/weekly/monthly) **or** a due date (not both). Optional start date. Link Board tasks. **Complete** or **Failed** (missed deadline). |
+| **Dashboard** | Period snapshot: logged time, activity count, time & sleep charts, category mix, goal progress. |
+| **Analytics** | Time over time by category, pie mix, breakdown **by task**. |
+| **Profile** | Display name, bio, timezone. Mobile also has **Appearance** (Light / Dark / Web themes). |
+| **Mobile** | Flutter Android/iOS client with the same product flow and shared API. |
 
 Categories: health, learning, work, sleep, entertainment, personal technical projects, AI content generation, others.
 
-**Sleep logs** use bedtime and wake-up times. Quality is **Ideal** (wake 6:00–6:30 AM and ≥ 7 hours), **Normal** (wake 6:30–7:30 AM and ≥ 7 hours), or **Bad** otherwise.
+**Sleep quality:** Ideal (wake 06:00–06:30 and ≥ 7h), Normal (wake 06:30–07:30 and ≥ 7h), or Bad otherwise.
 
 ## How the pieces connect
 
-1. Create **tasks** on the Board.
-2. Move a task to **In Progress**.
-3. **Log time** on Activities (or from a goal’s Log time form).
-4. Create a **goal**, associate Board tasks, and complete it — or let a missed due date mark it **Failed**.
-5. Review time on **Dashboard** and **Analytics**.
+```mermaid
+flowchart LR
+  WEB[React web] --> API[FastAPI]
+  MOB[Flutter mobile] --> API
+  WEB --> FB[Firebase Auth]
+  MOB --> FB
+  API --> FB
+  API --> DB[(SQLite / PostgreSQL)]
+```
 
-Goals count time from linked tasks. If a goal has no linked tasks yet, category time is used as a fallback.
+1. Sign in with **Firebase** (Google or email) on web or mobile.
+2. Clients send `Authorization: Bearer <Firebase ID token>` on every API call.
+3. FastAPI verifies the token, loads/creates the user, and serves **tasks · activities · goals · analytics**.
+4. Create **tasks** on the Board → move to **In Progress** → **log time** → track **goals** → review **Dashboard / Analytics**.
 
-## Architecture
+Goals count time from linked tasks (category fallback if none linked yet).
+
+**Full diagrams and data flow:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Architecture (summary)
 
 | Choice | Why |
 |---|---|
-| **React + Vite** | Fast UI for the board, forms, and charts. |
-| **MUI + Recharts** | Components and pictorial progress. |
-| **FastAPI** | Typed REST API, docs at `/docs`. |
-| **Firebase Auth** | Google popup + email/password. No passwords stored in this app. |
-| **SQLite + SQLAlchemy** | Local-first data with no extra DB setup. Schema migrations run on API startup. |
+| **React + Vite** | Fast web UI for board, forms, and charts |
+| **MUI + Recharts** | Components and pictorial progress (web) |
+| **Flutter** | Native Android / iOS with shared product rules |
+| **FastAPI** | Typed REST API, OpenAPI at `/docs` |
+| **Firebase Auth** | Google + email/password; no passwords stored in this app |
+| **SQLite / PostgreSQL** | Local SQLite; RDS PostgreSQL on AWS |
 
 ### Auth flow
 
-1. Sign in on `/login` with **Google** or **email**.
-2. The frontend holds a Firebase ID token.
+1. Sign in (web `/login` or mobile login screen).
+2. Client holds a Firebase ID token.
 3. API calls send `Authorization: Bearer <token>`.
-4. FastAPI verifies the token (Firebase Admin SDK), then loads or creates a `users` row by `firebase_uid`.
-5. Tasks, activities, goals, and analytics are scoped to that user.
+4. FastAPI verifies via Firebase Admin SDK, then loads/creates `users` by `firebase_uid`.
+5. All data is scoped to that user.
 
-Use **http://localhost:5173** (not mixed with `127.0.0.1`) so the auth session stays on one origin.
+Use **http://localhost:5173** for local web (not mixed with `127.0.0.1`) so the auth session stays on one origin.
 
-Optional local-only skip: set `DEV_SKIP_AUTH=true` on the backend to accept `Bearer dev:<uid>` tokens. Never enable this in production. The current login UI expects real Firebase config.
+Optional local-only skip: backend `DEV_SKIP_AUTH=true` + `Bearer dev:<uid>`. Never enable in production.
 
 ## Project layout
 
-```
+```text
 pulse-track/
   backend/     FastAPI app, SQLite locally / PostgreSQL on AWS
-  frontend/    React + Vite app
-  docs/        AWS deploy walkthrough
+  frontend/    React + Vite web app
+  mobile/      Flutter Android / iOS client
+  docs/        Architecture, deploy, UI, mobile specs
 ```
+
+## Documentation
+
+| Doc | Contents |
+|-----|----------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | **System architecture** — web, mobile, backend, auth, data, environments |
+| [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md) | AWS deploy (S3/CloudFront, ECS/App Runner, RDS) |
+| [docs/UI-ABILITIES.md](docs/UI-ABILITIES.md) | Web UI capabilities |
+| [docs/MOBILE.md](docs/MOBILE.md) | Mobile product documentation |
+| [docs/MOBILE-UI-SPEC.md](docs/MOBILE-UI-SPEC.md) | Mobile / API field contracts |
+| [mobile/README.md](mobile/README.md) | Run, APK build, Firebase, API defines |
+| [frontend/README.md](frontend/README.md) | Web app run / env notes |
 
 ## Deploy on AWS
 
-Web + a future mobile app share one HTTPS API and one PostgreSQL database. Follow [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md). Pushes to `master` deploy through GitHub Actions (ECR + ECS, optional S3/CloudFront).
+Web and mobile share one HTTPS API and one PostgreSQL database. Follow [docs/DEPLOY-AWS.md](docs/DEPLOY-AWS.md). Pushes to `master` can deploy via GitHub Actions (ECR + ECS, optional S3/CloudFront).
 
-For a screen-by-screen description of what users can do in the app, see [docs/UI-ABILITIES.md](docs/UI-ABILITIES.md).
-
-For **mobile app development** with the same features (API contracts, business rules, and screen specs), see [docs/MOBILE-UI-SPEC.md](docs/MOBILE-UI-SPEC.md).
+```text
+Browser ──► CloudFront ──► S3 (React)
+                │
+Mobile ─────────┼──► FastAPI (ECS / App Runner) ──► RDS
+                │              │
+                └──────── Firebase Admin (verify token)
+```
 
 ## Run locally
 
@@ -83,7 +113,11 @@ copy .env.example .env
 
 - API: http://127.0.0.1:8000
 - Health: http://127.0.0.1:8000/api/health
-- Docs: http://127.0.0.1:8000/docs
+- Swagger UI: http://127.0.0.1:8000/docs
+- ReDoc: http://127.0.0.1:8000/redoc
+- OpenAPI JSON: http://127.0.0.1:8000/openapi.json
+
+In the web app, open **API Docs** (`/api-docs`) for embedded Swagger.
 
 ### Frontend
 
@@ -96,7 +130,32 @@ npm run dev
 
 App: http://localhost:5173
 
-Fill `frontend/.env` with Firebase web config (`VITE_FIREBASE_*`) and keep `VITE_API_URL=http://127.0.0.1:8000`.
+Fill `frontend/.env` with Firebase web config (`VITE_FIREBASE_*`) and `VITE_API_URL=http://127.0.0.1:8000`.
+
+### Mobile (Flutter)
+
+```powershell
+# Optional: tunnel local API into Android emulator
+adb reverse tcp:8000 tcp:8000
+
+cd mobile
+flutter pub get
+flutter run
+```
+
+Uses the **same Firebase project** as the web app. On startup the app probes local `http://127.0.0.1:8000`; if unreachable it uses the **deployed API**.
+
+Build an APK for a physical phone:
+
+```powershell
+cd mobile
+flutter build apk --release --split-per-abi
+adb install -r build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
+```
+
+Details: [docs/MOBILE.md](docs/MOBILE.md) · [mobile/README.md](mobile/README.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+Optional local demo auth: `flutter run --dart-define=USE_DEV_AUTH=true` (requires backend `DEV_SKIP_AUTH=true`).
 
 ## Enable Firebase Auth
 
@@ -106,8 +165,9 @@ Fill `frontend/.env` with Firebase web config (`VITE_FIREBASE_*`) and keep `VITE
 4. Add `localhost` (and `127.0.0.1` if you use it) under **Authorized domains**.
 5. Backend: download a service account key as `backend/firebase-service-account.json`, **or** fill `FIREBASE_*` in `backend/.env`.
 6. Keep `DEV_SKIP_AUTH=false` for real sign-in.
+7. Mobile: Android app + SHA-1 + `google-services.json` (see [mobile/README.md](mobile/README.md)).
 
-Allow popups for localhost if Google sign-in is blocked.
+Allow popups for localhost if Google sign-in is blocked in the browser.
 
 ## Main API
 
@@ -117,6 +177,6 @@ Allow popups for localhost if Google sign-in is blocked.
 | Tasks | `GET/POST /api/tasks`, `GET/PATCH/DELETE /api/tasks/{id}` |
 | Activities | `GET/POST /api/activities`, `GET/PATCH/DELETE /api/activities/{id}` |
 | Goals | `GET/POST /api/goals`, `PATCH/DELETE /api/goals/{id}` |
-| Analytics | `GET /api/analytics/summary?period=day\|week\|month\|year` |
+| Analytics | `GET /api/analytics/summary?period=day\|week\|month\|year\|custom` |
 
-Analytics returns total minutes, category breakdown, **task breakdown**, time series, **sleep over time** (minutes + quality per day), and active goal progress.
+Analytics returns total minutes, category breakdown, **task breakdown**, time series, **sleep over time** (minutes + quality per day), and active goal progress. Custom ranges use `start_date` / `end_date`.

@@ -1,8 +1,31 @@
 # Pulse Track — Mobile UI Specification
 
-Use this document to build a native mobile app (iOS/Android) with the **same abilities** as the web app. It describes each main screen, the data it needs, API calls, validation rules, and user flows.
+Contract for the **Flutter mobile app** (`mobile/`) and any future native client: same abilities as the web app, with API payloads, validation, and screen data.
 
-For a shorter feature list, see [UI-ABILITIES.md](./UI-ABILITIES.md). For AWS deployment, see [DEPLOY-AWS.md](./DEPLOY-AWS.md).
+**Implemented client:** see [MOBILE.md](./MOBILE.md) (product) and [mobile/README.md](../mobile/README.md) (run / build).
+
+**System architecture:** [ARCHITECTURE.md](./ARCHITECTURE.md) — how web, mobile, Firebase, and FastAPI connect.
+
+For a shorter web feature list, see [UI-ABILITIES.md](./UI-ABILITIES.md). For AWS deployment, see [DEPLOY-AWS.md](./DEPLOY-AWS.md).
+
+---
+
+## 0. Implementation status (Flutter)
+
+| Area | Status in `mobile/` |
+|------|---------------------|
+| Firebase Google + email auth | Done |
+| Auto API URL (local probe → deployed HTTPS) | Done |
+| Board (filter pills, vertical cards, CRUD, goal link) | Done — no drag-and-drop |
+| Activities (filters, sleep, CRUD, duration as h/m) | Done |
+| Goals (hours/deadline, tasks, progress, complete) | Done |
+| Dashboard (Day / Week / 30 days / By month) | Done |
+| Analytics (+ Year; improved charts) | Done |
+| Themes (Light / Dark / Web) | Done — Profile → Appearance |
+| Profile | Done |
+| API Docs screen | Not on mobile (use web `/api-docs` or `{API}/docs`) |
+
+Package id: `com.pulsetrack.pulse_track_mobile`.
 
 ---
 
@@ -22,11 +45,15 @@ Authorization: Bearer <firebase_id_token>
 
 ### Base URL
 
-Configure the production API origin (App Runner / ECS HTTPS URL). Example:
+**Flutter (`AppConfig`):** on launch, probe `GET {local}/api/health` (default `http://127.0.0.1:8000`). If healthy, use local; otherwise use the deployed HTTPS API.
+
+Default deployed origin (override with `--dart-define=DEPLOYED_API_BASE_URL=…` or `API_BASE_URL=…`):
 
 ```text
-https://your-api.example.com
+https://pu-33c5978573c14366842f5c7087cb4002.ecs.us-east-1.on.aws
 ```
+
+Production builds for real phones should rely on the deployed URL (or an explicit `API_BASE_URL`). Emulators may use `adb reverse` so `127.0.0.1:8000` reaches the host.
 
 All paths below are relative to that base.
 
@@ -134,13 +161,15 @@ Profile: display name, timezone, bio
 
 ### 4.1 What the user sees
 
-1. **Page header** — title + short help (“Only In Progress tasks can be logged in Activities”).
-2. **New task** button (top-right).
-3. **Three columns:**
-   - **To Do** (`todo`)
-   - **In Progress** (`in_progress`)
-   - **Done** (`completed`)
-4. Each column shows a **count badge** and a scrollable list of **task cards**.
+**Flutter implementation:**
+
+1. **Page header** — “Board” + circular **+** (new task).
+2. Info banner — “Only In Progress tasks can be logged in Activities”.
+3. **Status filter pills** with counts: To Do · In Progress · Done (selected pill filters the list).
+4. **Vertical** scrollable list of **task cards** for the selected status.
+5. Each card has a **left accent border** in the category color.
+
+**Web:** three side-by-side Kanban columns with drag-and-drop (not required on mobile).
 
 ### 4.2 Task card content
 
@@ -152,18 +181,17 @@ Display on each card:
 | Title | `task.title` | Primary text |
 | Due date | `task.due_date` | Format e.g. “Aug 14”; highlight if overdue and not completed |
 | Goal | `task.goal_title` | If linked goal exists |
-| Category | `task.category` | Color-coded chip |
-| Activity stats | `task.activity_count`, `task.logged_minutes` | e.g. “3 activities · 120 min” |
+| Category | `task.category` | Color-coded chip + left border |
+| Activity stats | `task.activity_count`, `task.logged_minutes` | e.g. “2 activities · 120 min” |
 
 ### 4.3 User actions
 
 | Action | Behavior |
 |---|---|
-| Tap card | Open task detail / edit screen |
-| Drag between columns | `PATCH /api/tasks/{id}` with new `status` |
-| New task | Open create form (default status `todo`) |
-| Add in To Do column | Same as New task |
-| Edit | Open form with task fields |
+| Tap card | Open task detail / edit bottom sheet |
+| Change status | Edit form status field (mobile); drag columns (web) |
+| New task | Open create form (default status matches filter when sensible, else `todo`) |
+| Edit | Form with task fields |
 | Delete | `DELETE /api/tasks/{id}` — also deletes linked activity logs (DB cascade) |
 
 ### 4.4 Task form fields
@@ -270,17 +298,19 @@ PATCH /api/tasks/42
    - **Filter bar** (see below).
    - **Table / list** of logs.
 
+**Flutter layout:** title + **+ New**; summary `Logged N activities · X min total`; compact row **Search · Category · Date**; vertical cards (`PT-id · date`, category chip, title, notes, duration badge). Tap card to edit.
+
 ### 5.2 Filter bar
 
-All filters are **client-side** on the web app (loads all logs once). Mobile can do the same or use query params server-side.
+All filters are **client-side** on the web app (loads all logs once). Flutter does the same (loads `GET /api/activities`, filters in-app).
 
 | Filter | Client logic | Server alternative |
 |---|---|---|
 | Search | Match title, notes, or `PT-{id}` (case-insensitive) | — |
 | Category | Exact match on `activity.category` | `GET /api/activities?category=work` |
-| Task | Match `task_id` | `GET /api/activities?task_id=42` |
-| From date | `activity_date >= from` | `GET /api/activities?start_date=2026-08-01` |
-| To date | `activity_date <= to` | `GET /api/activities?end_date=2026-08-31` |
+| Task | Match `task_id` (web) | `GET /api/activities?task_id=42` |
+| Date | Flutter: single day (`activity_date == date`); web: from/to range | `start_date` / `end_date` query params |
+| From / To date | Web only | `GET /api/activities?start_date=…&end_date=…` |
 
 Combine server params for efficient mobile pagination later; current API returns full list sorted by date desc.
 
@@ -552,8 +582,10 @@ POST /api/goals
 
 ### 7.1 What the user sees
 
-1. **Header** — “Your pulse today” + **period toggle**: `day` | `week` | `month` | `year`
-2. **Quick actions** — deep links to Board, Activities, Goals
+1. **Header** — “Your pulse today” + **period toggle**
+   - **Web:** `day` | `week` | `month` | `year`
+   - **Flutter:** `day` | `week` | **30 days** | **By month** (calendar picker) — 30 days / By month call `period=custom` with `start_date` / `end_date`
+2. **Quick actions** — deep links to Board, Activities, Goals (web)
 3. **Stat tiles** (4)
 4. **Charts row 1** — Time by day (bar) | Sleep by day (quality-colored bars)
 5. **Charts row 2** — Category mix (pie) | Goal progress list
@@ -586,6 +618,7 @@ Subtitle on logged time: `start_date → end_date`.
 
 - Data: `minutes_over_time[]` — `{ date, value }` for every day in range (zeros included).
 - Chart: bar chart, Y = minutes.
+- **Flutter `year`:** aggregate days into monthly totals; title “Time by month”; ~12 bars with month labels (`mobile/lib/widgets/chart_series.dart`).
 
 **Sleep by day**
 
@@ -595,6 +628,7 @@ Subtitle on logged time: `start_date → end_date`.
 - Chart: bar chart, Y = hours (`minutes / 60`).
 - Bar colors: Ideal `#6EE7B7`, Normal `#7DD3FC`, Bad `#FCA5A5` (see `SLEEP_QUALITY_CHART_COLOR` in `frontend/src/sleep.js`).
 - Empty period → prompt to log sleep.
+- **Flutter:** plot days with sleep only; `year` → monthly aggregates; dense `month` may group by week.
 
 **Category mix**
 
@@ -627,18 +661,25 @@ Subtitle on logged time: `start_date → end_date`.
 GET /api/analytics/summary?period=day|week|month|year
 ```
 
-Optional custom range (not used on web Dashboard):
+Custom range (Flutter **30 days** and **By month**):
 
 ```http
 GET /api/analytics/summary?period=custom&start_date=2026-08-01&end_date=2026-08-23
 ```
 
-### 7.6 Mobile UX suggestions
+| Mobile pill | Request |
+|-------------|---------|
+| Day / Week | `period=day` / `period=week` |
+| 30 days | `period=custom`, start = today−29, end = today |
+| By month | `period=custom`, first day of month → min(last day, today) |
 
-- Default period: `week` (web Dashboard) — consider same.
+### 7.6 Mobile UX notes
+
+- Default period: `week`.
 - Pull-to-refresh on summary.
-- Quick actions as buttons or FAB menu.
-- Use native charts (Swift Charts, MPAndroidChart, etc.) with same data shapes.
+- Sleep bars colored by Ideal / Normal / Bad; empty days grey.
+- Durations shown as hours and minutes (`165h 7m`).
+- Appearance themes: Light / Dark / Web (Profile).
 
 ---
 
@@ -649,8 +690,10 @@ GET /api/analytics/summary?period=custom&start_date=2026-08-01&end_date=2026-08-
 
 ### 8.1 What the user sees
 
-1. **Header** + period toggle (`day` | `week` | `month` | `year`)
-2. **Logged minutes over time** — full-width chart
+1. **Header** + period toggle
+   - **Web:** `day` | `week` | `month` | `year`
+   - **Flutter:** `day` | `week` | **30 days** | **By month** | **Year**
+2. **Logged minutes over time** — full-width chart (Flutter: hours on Y-axis; stacked bars for day/year/short ranges)
 3. **Two columns** (stack on mobile):
    - **By category** — pie + list
    - **By task** — horizontal bar + list
@@ -789,37 +832,38 @@ Refresh Firebase ID token before retry on 401.
 
 ---
 
-## 12. Suggested mobile navigation
+## 12. Mobile navigation (Flutter)
 
-Map web sidebar to mobile tabs or drawer:
+Bottom tabs (implemented):
 
 | Tab | Screen |
 |---|---|
-| Board | Kanban (home) |
-| Dashboard | Summary |
-| Activities | Log list |
-| Goals | Goal list + editor |
+| Board | Status filter pills + vertical task cards |
+| Dashboard | Period summary + charts |
+| Activities | Log list + filters |
+| Goals | Goal list + editor sheets |
 | Analytics | Charts |
-| Profile | Settings |
+| Profile | Settings + API debug |
 
-Auth stack: Login / Register (Firebase) → main tabs after token available.
+Auth stack: Login (Google / email / register toggle) → main tabs after Firebase session is ready.
 
 ---
 
 ## 13. Parity checklist
 
-Use this when implementing each screen:
+Flutter client status:
 
-- [ ] **Board** — 3 columns, drag/status change, CRUD, goal link, activity tab on edit, overdue styling
-- [ ] **Activities** — filters, table, modal CRUD, In Progress-only create, edit without task change
-- [ ] **Goals** — hours vs due modes, task linking, progress bar, complete, auto-fail display, inline log
-- [ ] **Dashboard** — 4 periods, 4 stats, time + sleep charts, category mix, goal list (equal-height panels)
-- [ ] **Analytics** — 4 periods, line/bar time chart, category pie, task bars
-- [ ] **Profile** — read email, edit name/timezone/bio
-- [ ] **Auth** — Firebase Google + email, Bearer token on all `/api/*`
-- [ ] **Categories** — all 8 values with labels and colors
-- [ ] **Sleep quality** — Ideal/Normal/Bad from wake window + ≥ 7 hours; sleep_over_time on analytics
-- [ ] **PT-{id}** — consistent task ticket display
+- [x] **Board** — filter pills + vertical cards, CRUD, goal link, activities on edit, overdue styling (no drag-and-drop)
+- [x] **Activities** — search/category/date filters, card list, modal CRUD, In Progress-only create, sleep quality
+- [x] **Goals** — hours vs due modes, task linking, progress, complete, log-time shortcut
+- [x] **Dashboard** — 4 periods, stats, time + sleep charts (year → months), category mix, goals
+- [x] **Analytics** — 4 periods, category pie, over-time (year → months), task bars
+- [x] **Profile** — read email, edit name/timezone/bio, sign out
+- [x] **Auth** — Firebase Google + email, Bearer token on `/api/*`, API URL auto-resolve
+- [x] **Categories** — all 8 values with labels and colors
+- [x] **Sleep quality** — Ideal/Normal/Bad; sleep_over_time on dashboard
+- [x] **PT-{id}** — consistent ticket display
+- [ ] **API Docs** — web only
 
 ---
 
@@ -827,10 +871,13 @@ Use this when implementing each screen:
 
 | Path | Relevance |
 |---|---|
-| `frontend/src/pages/*.jsx` | Web UI reference implementations |
+| `docs/MOBILE.md` | Mobile product documentation |
+| `mobile/README.md` | Run, build APK, Firebase, API defines |
+| `mobile/lib/` | Flutter implementation |
+| `frontend/src/pages/*.jsx` | Web UI reference |
 | `frontend/src/api.js` | Exact API paths used by web |
 | `frontend/src/constants.js` | Categories and colors |
-| `frontend/src/sleep.js` | Sleep duration + quality classification (mirrors backend) |
+| `frontend/src/sleep.js` | Sleep duration + quality (mirrors backend) |
 | `backend/app/sleep.py` | Sleep duration + quality rules |
 | `backend/app/schemas.py` | Request/response validation |
 | `backend/app/routers/*.py` | Business rules and endpoints |

@@ -1,16 +1,73 @@
-# React + Vite
+# Pulse Track — Web frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite SPA for Pulse Track. Shares the **FastAPI backend** and **Firebase Auth** project with the Flutter mobile app.
 
-Currently, two official plugins are available:
+| Doc | Purpose |
+|-----|---------|
+| [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) | How web, mobile, and API connect |
+| [docs/UI-ABILITIES.md](../docs/UI-ABILITIES.md) | Screen-by-screen web capabilities |
+| [docs/DEPLOY-AWS.md](../docs/DEPLOY-AWS.md) | S3 / CloudFront deploy |
+| Root [README.md](../README.md) | Full monorepo setup |
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **React** + **Vite**
+- **MUI** components
+- **Recharts** (Dashboard / Analytics)
+- **Firebase JS SDK** (Google + email/password)
+- API client: `src/api.js` → `VITE_API_URL`
 
-## Expanding the Oxlint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Run locally
+
+```powershell
+cd frontend
+copy .env.example .env
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173** (prefer `localhost` over `127.0.0.1` for Firebase session consistency).
+
+### Environment
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_API_URL` | Backend origin, e.g. `http://127.0.0.1:8000` |
+| `VITE_FIREBASE_*` | Web Firebase config from the Firebase console |
+
+---
+
+## Routes (signed-in)
+
+| Path | Screen |
+|------|--------|
+| `/` | Board |
+| `/dashboard` | Dashboard |
+| `/activities` | Activities |
+| `/goals` | Goals |
+| `/analytics` | Analytics |
+| `/api-docs` | Embedded Swagger |
+| `/profile` | Profile |
+| `/login`, `/register` | Auth |
+
+---
+
+## Build
+
+```powershell
+npm run build
+```
+
+Output: `dist/` — upload to S3 for CloudFront (see [DEPLOY-AWS.md](../docs/DEPLOY-AWS.md)).
+
+---
+
+## Notes
+
+- Visual theme: dark navy + cyan tokens in `src/index.css` (mobile “Web” theme mirrors this).
+- Activity logs only attach to **In Progress** tasks.
+- Sleep quality rules match the backend and mobile client.
