@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../config/app_config.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/theme_rebuild.dart';
 import '../widgets/brand.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -96,6 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watchAppearance();
     final auth = context.watch<AuthService>();
     final configured = auth.firebaseConfigured;
 

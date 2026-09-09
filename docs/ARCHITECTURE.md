@@ -47,7 +47,7 @@ flowchart TB
 
 | Layer | Responsibility |
 |-------|----------------|
-| **Web** | Browser UX: Kanban board, forms, charts, embedded Swagger (`/api-docs`) |
+| **Web** | Browser UX: Kanban board, forms, charts |
 | **Mobile** | Native UX: bottom tabs, sheets, themes (Light / Dark / Web), APK builds |
 | **Backend** | Auth verification, CRUD, analytics aggregation, schema bootstrap |
 | **Firebase** | User accounts and ID tokens only (no app business data) |
@@ -147,7 +147,7 @@ flowchart TB
     VITE["Vite + React"]
     AUTH_W["Firebase JS SDK<br/>auth session"]
     API_W["api.js<br/>fetch + Bearer token"]
-    PAGES["pages/<br/>Board, Dashboard,<br/>Activities, Goals,<br/>Analytics, Profile, ApiDocs"]
+    PAGES["pages/<br/>Board, Dashboard,<br/>Activities, Goals,<br/>Analytics, Profile"]
     LAY["Layout.jsx<br/>sidebar + top bar"]
   end
 
@@ -162,7 +162,7 @@ flowchart TB
 | Env | `frontend/.env` — `VITE_API_URL`, `VITE_FIREBASE_*` |
 | Charts | Recharts on Dashboard / Analytics |
 | Theme | Dark navy + cyan CSS tokens (`index.css`) |
-| API Docs | Embedded Swagger at `/api-docs` |
+| OpenAPI | Backend only: `{API}/docs`, `/redoc`, `/openapi.json` |
 
 Local origin should stay **`http://localhost:5173`** so Firebase session cookies stay on one host.
 

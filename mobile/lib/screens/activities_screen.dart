@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/pulse_palette.dart';
+import '../theme/theme_rebuild.dart';
 import '../widgets/common.dart';
 
 class ActivitiesScreen extends StatefulWidget {
@@ -410,6 +411,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watchAppearance();
     return Scaffold(
       backgroundColor: AppTheme.bg,
       appBar: AppBar(

@@ -35,7 +35,7 @@ See [ARCHITECTURE.md](../docs/ARCHITECTURE.md) for full diagrams.
 | **Analytics** | Same ranges + **Year**; category pie; time-over-time charts; by-task |
 | **Profile** | Name, timezone, bio; **Appearance** (Light / Dark / Web); API debug |
 
-**Not on mobile:** embedded API Docs — use the web app or `{API}/docs`.
+**Not on mobile:** API Docs — use the backend Swagger UI at `{API}/docs`.
 
 **Navigation:** bottom tabs — Board, Dashboard, Activities, Goals, Analytics, Profile.
 

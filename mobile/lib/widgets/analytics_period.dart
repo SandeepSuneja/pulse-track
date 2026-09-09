@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
 import '../theme/pulse_palette.dart';
 
 /// Dashboard / Analytics range modes.
@@ -111,7 +110,7 @@ class AnalyticsPeriodBar extends StatelessWidget {
                   title: Text(_monthYear(m)),
                   trailing: value.selectedMonth.year == m.year &&
                           value.selectedMonth.month == m.month
-                      ? Icon(Icons.check, color: AppTheme.primary)
+                      ? Icon(Icons.check, color: context.pulse.primary)
                       : null,
                   onTap: () => Navigator.pop(ctx, m),
                 ),

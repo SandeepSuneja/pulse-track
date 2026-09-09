@@ -50,7 +50,6 @@ Open **http://localhost:5173** (prefer `localhost` over `127.0.0.1` for Firebase
 | `/activities` | Activities |
 | `/goals` | Goals |
 | `/analytics` | Analytics |
-| `/api-docs` | Embedded Swagger |
 | `/profile` | Profile |
 | `/login`, `/register` | Auth |
 

@@ -22,7 +22,6 @@ import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined'
 import TimelineOutlinedIcon from '@mui/icons-material/TimelineOutlined'
 import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined'
 import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined'
-import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined'
 import PersonOutlineOutlinedIcon from '@mui/icons-material/PersonOutlineOutlined'
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined'
 import { useAuth } from '../AuthContext'
@@ -35,7 +34,6 @@ const links = [
   { to: '/activities', label: 'Activities', icon: TimelineOutlinedIcon },
   { to: '/goals', label: 'Goals', icon: FlagOutlinedIcon },
   { to: '/analytics', label: 'Analytics', icon: InsightsOutlinedIcon },
-  { to: '/api-docs', label: 'API Docs', icon: MenuBookOutlinedIcon },
   { to: '/profile', label: 'Profile', icon: PersonOutlineOutlinedIcon },
 ]
 

@@ -9,6 +9,7 @@ import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/pulse_palette.dart';
+import '../theme/theme_rebuild.dart';
 import '../widgets/analytics_period.dart';
 import '../widgets/brand.dart';
 import '../widgets/chart_series.dart';
@@ -73,6 +74,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watchAppearance();
     final chartPeriod = _range.chartPeriod;
     final monthLabel = _range.mode == AnalyticsRangeMode.calendar
         ? _range.calendarLabel

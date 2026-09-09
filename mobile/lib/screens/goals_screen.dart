@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../constants/categories.dart';
-import '../constants/sleep.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../theme/pulse_palette.dart';
+import '../theme/theme_rebuild.dart';
 import '../widgets/brand.dart';
 import '../widgets/common.dart';
 
@@ -379,238 +380,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
     }
   }
 
-  Future<void> _logTime({
-    required GoalItem goal,
-    required List<TaskItem> allTasks,
-  }) async {
-    if (goal.status != 'active') return;
-    final linked = goal.taskIds.toSet();
-    final matches = allTasks
-        .where(
-          (t) =>
-              t.status == 'in_progress' &&
-              (linked.isEmpty ? t.category == goal.category : linked.contains(t.id)),
-        )
-        .toList();
-    if (matches.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No In Progress tasks linked to this goal.'),
-        ),
-      );
-      return;
-    }
-
-    final api = context.read<AuthService>().api;
-    var task = matches.first;
-    final dateCtrl = TextEditingController(text: isoToday());
-    final hoursCtrl = TextEditingController(text: '1');
-    final minutesCtrl = TextEditingController(text: '0');
-    final notesCtrl = TextEditingController();
-    final sleepStartCtrl = TextEditingController(text: '23:00');
-    final sleepEndCtrl = TextEditingController(text: '06:30');
-    String? formError;
-
-    final ok = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setLocal) {
-            final isSleep = task.category == 'sleep';
-            final sleepMins =
-                sleepDurationMinutes(sleepStartCtrl.text, sleepEndCtrl.text);
-            final sleepQ =
-                classifySleepQuality(sleepStartCtrl.text, sleepEndCtrl.text);
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 16,
-                bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Log time · ${goal.title}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<TaskItem>(
-                      initialValue: task,
-                      items: matches
-                          .map(
-                            (t) => DropdownMenuItem(
-                              value: t,
-                              child: Text('${t.ticketId} · ${t.title}'),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) => setLocal(() => task = v ?? task),
-                      decoration: const InputDecoration(labelText: 'Task'),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final picked =
-                            await pickIsoDate(context, initial: dateCtrl.text);
-                        if (picked != null) {
-                          setLocal(() => dateCtrl.text = picked);
-                        }
-                      },
-                      icon: const Icon(Icons.event, size: 18),
-                      label: Text('Date: ${dateCtrl.text}'),
-                    ),
-                    const SizedBox(height: 12),
-                    if (isSleep) ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                final t = await pickTimeOfDay(
-                                  context,
-                                  initialHhmm: sleepStartCtrl.text,
-                                );
-                                if (t != null) {
-                                  setLocal(
-                                    () => sleepStartCtrl.text = formatTimeOfDay(t),
-                                  );
-                                }
-                              },
-                              child: Text('Start ${sleepStartCtrl.text}'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                final t = await pickTimeOfDay(
-                                  context,
-                                  initialHhmm: sleepEndCtrl.text,
-                                );
-                                if (t != null) {
-                                  setLocal(
-                                    () => sleepEndCtrl.text = formatTimeOfDay(t),
-                                  );
-                                }
-                              },
-                              child: Text('Wake ${sleepEndCtrl.text}'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Text(
-                            'Duration: ${sleepMins == null ? '—' : formatDuration(sleepMins)}',
-                            style: TextStyle(color: AppTheme.muted),
-                          ),
-                          const SizedBox(width: 8),
-                          SleepQualityChip(quality: sleepQ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        sleepQualityHint,
-                        style: TextStyle(
-                          color: AppTheme.muted,
-                          fontSize: 12,
-                          height: 1.35,
-                        ),
-                      ),
-                    ] else ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: hoursCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(labelText: 'Hours'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: minutesCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(labelText: 'Minutes'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: notesCtrl,
-                      maxLines: 2,
-                      decoration: const InputDecoration(labelText: 'Notes'),
-                    ),
-                    if (formError != null) ...[
-                      const SizedBox(height: 8),
-                      Text(formError!, style: const TextStyle(color: Colors.redAccent)),
-                    ],
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: () {
-                        if (isSleep) {
-                          if (sleepMins == null || sleepMins < 1) {
-                            setLocal(() => formError = 'Invalid sleep times.');
-                            return;
-                          }
-                        } else {
-                          final total = (int.tryParse(hoursCtrl.text) ?? 0) * 60 +
-                              (int.tryParse(minutesCtrl.text) ?? 0);
-                          if (total < 1) {
-                            setLocal(() => formError = 'Enter at least 1 minute.');
-                            return;
-                          }
-                        }
-                        Navigator.pop(context, true);
-                      },
-                      child: const Text('Save log'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (ok != true || !mounted) return;
-    final body = <String, dynamic>{
-      'task_id': task.id,
-      'activity_date': dateCtrl.text.trim(),
-      'notes': notesCtrl.text.trim(),
-    };
-    if (task.category == 'sleep') {
-      final sleepMins =
-          sleepDurationMinutes(sleepStartCtrl.text, sleepEndCtrl.text);
-      body['sleep_start_time'] = sleepStartCtrl.text.trim();
-      body['sleep_end_time'] = sleepEndCtrl.text.trim();
-      body['duration_minutes'] = sleepMins;
-    } else {
-      body['duration_minutes'] = (int.tryParse(hoursCtrl.text) ?? 0) * 60 +
-          (int.tryParse(minutesCtrl.text) ?? 0);
-    }
-    try {
-      await api.createActivity(body);
-      await _refresh();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    context.watchAppearance();
     return Scaffold(
       appBar: AppBar(
         title: const BrandedAppBarTitle('Goals'),
@@ -650,6 +422,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
               itemBuilder: (context, i) {
                 final g = data.goals[i];
                 final cat = categoryOf(g.category);
+                final p = context.pulse;
                 final progress =
                     _progressFor(g, data.weekProgress, data.activities);
                 final linkedTitles = g.tasks.isNotEmpty
@@ -669,93 +442,135 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   if (g.startDate != null && g.startDate!.isNotEmpty)
                     'starts ${g.startDate}',
                 ];
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                final isActive = g.status == 'active';
+                final rowButtonStyle = OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(40),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  textStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+                return Material(
+                  color: p.panel,
+                  elevation: 0,
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: p.line),
+                  ),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                g.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
+                        Container(width: 4, color: cat.fg),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        g.title,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                          color: p.text,
+                                        ),
+                                      ),
+                                    ),
+                                    CategoryChip(
+                                      label: cat.label,
+                                      fg: cat.fg,
+                                      bg: cat.bg,
+                                    ),
+                                  ],
                                 ),
-                              ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  metaBits.join(' · '),
+                                  style: TextStyle(
+                                    color: p.muted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                if (linkedTitles.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Tasks: $linkedTitles',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: p.text,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                                if (progress.target > 0) ...[
+                                  LinearProgressIndicator(
+                                    value: (progress.pct / 100).clamp(0, 1),
+                                    color: cat.fg,
+                                    backgroundColor: p.line,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${formatDuration(progress.actual)} / ${formatDuration(progress.target)}'
+                                    ' · ${progress.pct.round()}%',
+                                    style: TextStyle(
+                                      color: p.muted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ] else ...[
+                                  Text(
+                                    'Logged ${formatDuration(progress.actual)}',
+                                    style: TextStyle(
+                                      color: p.muted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 12),
+                                if (isActive)
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          style: rowButtonStyle,
+                                          onPressed: () => _openForm(
+                                            goal: g,
+                                            allTasks: data.tasks,
+                                          ),
+                                          child: const Text('Edit'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          style: rowButtonStyle,
+                                          onPressed: () => _complete(g),
+                                          child: const Text('Complete'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                if (isActive) const SizedBox(height: 4),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: TextButton(
+                                    onPressed: () => _delete(g),
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.redAccent),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            CategoryChip(label: cat.label, fg: cat.fg, bg: cat.bg),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          metaBits.join(' · '),
-                          style: TextStyle(color: AppTheme.muted, fontSize: 12),
-                        ),
-                        if (linkedTitles.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            'Tasks: $linkedTitles',
-                            style: const TextStyle(fontSize: 13),
                           ),
-                        ],
-                        const SizedBox(height: 10),
-                        if (progress.target > 0) ...[
-                          LinearProgressIndicator(
-                            value: (progress.pct / 100).clamp(0, 1),
-                            color: cat.fg,
-                            backgroundColor: AppTheme.line,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${formatDuration(progress.actual)} / ${formatDuration(progress.target)}'
-                            ' · ${progress.pct.round()}%',
-                            style: TextStyle(
-                              color: AppTheme.muted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ] else ...[
-                          Text(
-                            'Logged ${formatDuration(progress.actual)}',
-                            style: TextStyle(
-                              color: AppTheme.muted,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          children: [
-                            if (g.status == 'active')
-                              OutlinedButton(
-                                onPressed: () =>
-                                    _openForm(goal: g, allTasks: data.tasks),
-                                child: const Text('Edit'),
-                              ),
-                            if (g.status == 'active')
-                              OutlinedButton(
-                                onPressed: () => _complete(g),
-                                child: const Text('Complete'),
-                              ),
-                            if (g.status == 'active')
-                              OutlinedButton(
-                                onPressed: () =>
-                                    _logTime(goal: g, allTasks: data.tasks),
-                                child: const Text('Log time'),
-                              ),
-                            TextButton(
-                              onPressed: () => _delete(g),
-                              child: const Text(
-                                'Delete',
-                                style: TextStyle(color: Colors.redAccent),
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),

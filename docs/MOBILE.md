@@ -62,7 +62,7 @@ Details (sequence diagrams, URL resolution, domain model): **[ARCHITECTURE.md](.
 | Analytics | Yes — same ranges + **Year**; stacked/line charts | Same core |
 | Appearance themes | Light / Dark / Web | CSS navy+cyan only |
 | Profile | Yes | Same core |
-| API Docs (Swagger) | No — use web or `/docs` | Yes |
+| API Docs (Swagger) | No — use `{API}/docs` | Backend `/docs` |
 | Login / register | Single screen with toggle | Separate routes |
 
 Business rules (In Progress–only logging, sleep Ideal/Normal/Bad, goal failed state, categories) match the web and backend.
@@ -112,7 +112,7 @@ Bottom navigation:
 - Create/edit: title, category, **hours** (daily/weekly/monthly + target) or **deadline** (`period: deadline` + end date)
 - Link multiple Board tasks by category
 - Progress bars, complete, delete
-- Optional log-time shortcut for linked In Progress tasks
+- Progress from linked activities; Edit / Complete / Delete (compact)
 
 ### Dashboard
 
