@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/pulse_palette.dart';
+import '../theme/theme_rebuild.dart';
 import '../widgets/analytics_period.dart';
 import '../widgets/brand.dart';
 import '../widgets/chart_series.dart';
@@ -103,6 +104,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watchAppearance();
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(title: const BrandedAppBarTitle('Analytics')),

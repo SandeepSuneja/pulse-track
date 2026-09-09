@@ -6,6 +6,7 @@ import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/pulse_palette.dart';
+import '../theme/theme_rebuild.dart';
 import '../widgets/common.dart';
 
 class BoardScreen extends StatefulWidget {
@@ -315,6 +316,7 @@ class _BoardScreenState extends State<BoardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watchAppearance();
     return Scaffold(
       backgroundColor: AppTheme.bg,
       appBar: AppBar(

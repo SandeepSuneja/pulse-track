@@ -6,9 +6,14 @@ import 'theme_controller.dart';
 
 /// Builds [ThemeData] and exposes palette tokens.
 ///
-/// Prefer [context.pulse] in widgets. Static [AppTheme] color getters read from
-/// the bound [ThemeController] — call [bind] whenever the controller is used
-/// (including on each theme rebuild) so hot reload cannot desync colors.
+/// Prefer [context.pulse] in widgets — that reads [ThemeExtension] and
+/// automatically rebuilds when appearance changes.
+///
+/// Static [AppTheme] color getters read the bound [ThemeController] but do
+/// **not** register a Flutter dependency. Screens that still use them must call
+/// [BuildContext.watchAppearance] (or `watch<ThemeController>()`) in [build]
+/// so they refresh when Light / Dark / Web changes. Call [bind] on each
+/// [ThemeController] rebuild so hot reload cannot desync static tokens.
 class AppTheme {
   static ThemeController? _controller;
 

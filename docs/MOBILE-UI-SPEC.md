@@ -23,7 +23,7 @@ For a shorter web feature list, see [UI-ABILITIES.md](./UI-ABILITIES.md). For AW
 | Analytics (+ Year; improved charts) | Done |
 | Themes (Light / Dark / Web) | Done — Profile → Appearance |
 | Profile | Done |
-| API Docs screen | Not on mobile (use web `/api-docs` or `{API}/docs`) |
+| API Docs screen | Not on mobile (use `{API}/docs`) |
 
 Package id: `com.pulsetrack.pulse_track_mobile`.
 
@@ -435,7 +435,7 @@ PATCH /api/activities/10
 ## 6. Goals
 
 **Web route:** `/goals`  
-**Purpose:** Set time or deadline targets, link Board tasks, log time from goal context, mark complete.
+**Purpose:** Set time or deadline targets, link Board tasks, mark complete. Log time from **Activities**.
 
 ### 6.1 What the user sees
 
@@ -498,13 +498,8 @@ Two main areas (web uses side-by-side; mobile can use tabs or stacked sections):
 | Edit | `PATCH /api/goals/{id}` | Active only; omit `end_date` if locked |
 | Complete | `PATCH /api/goals/{id}` `{ "status": "completed" }` | Active only |
 | Delete | `DELETE /api/goals/{id}` | Unlinks tasks (`goal_id` → null) |
-| Log time | `POST /api/activities` | Inline form; same as Activities |
 
-**Log time from goal:**
-
-1. User taps **Log time** on active goal.
-2. Show task picker: In Progress tasks that are linked to goal OR (if no links) same category.
-3. Submit activity create payload.
+Log time from the **Activities** screen (`POST /api/activities`), not from Goals.
 
 ### 6.6 Auto-fail overdue goals
 
@@ -569,9 +564,8 @@ POST /api/goals
 
 ### 6.8 Mobile UX suggestions
 
-- Separate **Goal detail** screen with actions: Edit, Log time, Complete, Delete.
+- Compact actions on each card: Edit, Complete, Delete (no Log time).
 - Disable edit UI for completed/failed with explanation.
-- Inline log form can be a bottom sheet pre-filtered to goal’s tasks.
 
 ---
 
@@ -855,7 +849,7 @@ Flutter client status:
 
 - [x] **Board** — filter pills + vertical cards, CRUD, goal link, activities on edit, overdue styling (no drag-and-drop)
 - [x] **Activities** — search/category/date filters, card list, modal CRUD, In Progress-only create, sleep quality
-- [x] **Goals** — hours vs due modes, task linking, progress, complete, log-time shortcut
+- [x] **Goals** — hours vs due modes, task linking, progress, complete (log time via Activities)
 - [x] **Dashboard** — 4 periods, stats, time + sleep charts (year → months), category mix, goals
 - [x] **Analytics** — 4 periods, category pie, over-time (year → months), task bars
 - [x] **Profile** — read email, edit name/timezone/bio, sign out
@@ -863,7 +857,7 @@ Flutter client status:
 - [x] **Categories** — all 8 values with labels and colors
 - [x] **Sleep quality** — Ideal/Normal/Bad; sleep_over_time on dashboard
 - [x] **PT-{id}** — consistent ticket display
-- [ ] **API Docs** — web only
+- [ ] **API Docs** — backend `/docs` only (not in web or mobile UI)
 
 ---
 

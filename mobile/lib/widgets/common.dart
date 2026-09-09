@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../constants/sleep.dart';
-import '../theme/app_theme.dart';
 import '../theme/pulse_palette.dart';
 
 class LoadingView extends StatelessWidget {
@@ -11,13 +10,14 @@ class LoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pulse;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: AppTheme.primary),
+          CircularProgressIndicator(color: p.primary),
           const SizedBox(height: 12),
-          Text(message, style: TextStyle(color: AppTheme.muted)),
+          Text(message, style: TextStyle(color: p.muted)),
         ],
       ),
     );
@@ -63,11 +63,13 @@ class CategoryChip extends StatelessWidget {
   /// fall back to a readable ink color for the current theme.
   Color _labelColor(BuildContext context) {
     if (fg.computeLuminance() <= 0.65) return fg;
-    return AppTheme.isDark ? AppTheme.text : const Color(0xFF475569);
+    final p = context.pulse;
+    return p.isDark ? p.text : const Color(0xFF475569);
   }
 
   @override
   Widget build(BuildContext context) {
+    final p = context.pulse;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -75,7 +77,7 @@ class CategoryChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         border: fg.computeLuminance() > 0.65
             ? Border.all(
-                color: AppTheme.isDark ? AppTheme.lineStrong : const Color(0xFFCBD5E1),
+                color: p.isDark ? p.lineStrong : const Color(0xFFCBD5E1),
               )
             : null,
       ),
@@ -189,7 +191,7 @@ class SleepQualityChip extends StatelessWidget {
 
   final String? quality;
 
-  static Color fgFor(String? quality) {
+  static Color fgFor(String? quality, {Color? mutedFallback}) {
     switch (quality) {
       case 'ideal':
         return const Color(0xFF059669);
@@ -198,11 +200,11 @@ class SleepQualityChip extends StatelessWidget {
       case 'bad':
         return const Color(0xFFE11D48);
       default:
-        return AppTheme.muted;
+        return mutedFallback ?? const Color(0xFF64748B);
     }
   }
 
-  static Color bgFor(String? quality) {
+  static Color bgFor(String? quality, {Color? lineFallback}) {
     switch (quality) {
       case 'ideal':
         return const Color(0xFFD1FAE5);
@@ -211,24 +213,25 @@ class SleepQualityChip extends StatelessWidget {
       case 'bad':
         return const Color(0xFFFFE4E6);
       default:
-        return AppTheme.line.withValues(alpha: 0.4);
+        return (lineFallback ?? const Color(0xFFE2E8F0)).withValues(alpha: 0.4);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (quality == null || quality!.isEmpty) return const SizedBox.shrink();
+    final p = context.pulse;
     final label = sleepQualityLabel[quality] ?? quality!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: bgFor(quality),
+        color: bgFor(quality, lineFallback: p.line),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: fgFor(quality),
+          color: fgFor(quality, mutedFallback: p.muted),
           fontSize: 11,
           fontWeight: FontWeight.w700,
         ),

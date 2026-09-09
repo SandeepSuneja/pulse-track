@@ -2,14 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
-import { CATEGORIES, categoryLabel } from '../constants'
-import {
-  SLEEP_QUALITY_LABEL,
-  SLEEP_QUALITY_STYLE,
-  classifySleepQuality,
-  sleepDurationMinutes,
-} from '../sleep'
-import { combineDuration, formatDuration } from '../duration'
+import { CATEGORIES, categoryColors, categoryLabel } from '../constants'
+import { formatDuration } from '../duration'
 
 const emptyForm = () => ({
   title: '',
@@ -20,16 +14,6 @@ const emptyForm = () => ({
   start_date: '',
   end_date: '',
   task_ids: [],
-})
-
-const emptyLogForm = () => ({
-  task_id: '',
-  notes: '',
-  activity_date: new Date().toISOString().slice(0, 10),
-  duration_hours: 1,
-  duration_minutes: 0,
-  sleep_start_time: '23:00',
-  sleep_end_time: '06:30',
 })
 
 function goalToForm(goal) {
@@ -47,17 +31,15 @@ function goalToForm(goal) {
 }
 
 function formatGoalMeta(goal) {
-  const bits = [categoryLabel(goal.category)]
+  const bits = []
   if (goal.period === 'deadline' || (!goal.target_minutes && goal.end_date)) {
-    bits.push(`due ${goal.end_date}`)
+    bits.push(`Due ${goal.end_date}`)
   } else if (goal.target_minutes) {
     const hours = goal.target_minutes / 60
     const hoursLabel = Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1)}h`
     bits.push(`${hoursLabel} / ${goal.period}`)
   }
-  if (goal.start_date) bits.push(`starts ${goal.start_date}`)
-  const taskCount = (goal.tasks || []).length
-  if (taskCount) bits.push(`${taskCount} task${taskCount === 1 ? '' : 's'}`)
+  if (goal.start_date) bits.push(`Starts ${goal.start_date}`)
   return bits.join(' · ')
 }
 
@@ -99,12 +81,8 @@ export default function Goals() {
   const [weekById, setWeekById] = useState({})
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
-  const [logGoalId, setLogGoalId] = useState(null)
-  const [logForm, setLogForm] = useState(emptyLogForm)
   const [error, setError] = useState('')
-  const [logError, setLogError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [logBusy, setLogBusy] = useState(false)
 
   const isEditing = editingId != null
   const editingGoal = useMemo(
@@ -138,34 +116,6 @@ export default function Goals() {
   const selectableTasks = useMemo(() => {
     return allTasks.filter((t) => !form.category || t.category === form.category)
   }, [allTasks, form.category])
-
-  const logGoal = useMemo(
-    () => goals.find((g) => g.id === logGoalId) || null,
-    [goals, logGoalId],
-  )
-
-  const matchingLogTasks = useMemo(() => {
-    if (!logGoal) return []
-    const linked = new Set(logGoal.task_ids || [])
-    return allTasks.filter(
-      (t) =>
-        t.status === 'in_progress' &&
-        (linked.size === 0 ? t.category === logGoal.category : linked.has(t.id)),
-    )
-  }, [allTasks, logGoal])
-
-  const logTask = useMemo(
-    () => matchingLogTasks.find((t) => String(t.id) === String(logForm.task_id)) || null,
-    [matchingLogTasks, logForm.task_id],
-  )
-  const isSleepLog = logTask?.category === 'sleep'
-  const logSleepMinutes = isSleepLog
-    ? sleepDurationMinutes(logForm.sleep_start_time, logForm.sleep_end_time)
-    : null
-  const logSleepQuality = isSleepLog
-    ? classifySleepQuality(logForm.sleep_start_time, logForm.sleep_end_time)
-    : null
-  const logSleepStyle = SLEEP_QUALITY_STYLE[logSleepQuality] || SLEEP_QUALITY_STYLE.bad
 
   function setMode(mode) {
     if (dueDateLocked && mode === 'hours') return
@@ -204,33 +154,9 @@ export default function Goals() {
       setError('Completed goals cannot be edited.')
       return
     }
-    setLogGoalId(null)
     setEditingId(goal.id)
     setForm(goalToForm(goal))
     setError('')
-  }
-
-  function openLog(goal) {
-    if (goal.status !== 'active') return
-    const linked = new Set(goal.task_ids || [])
-    const matches = allTasks.filter(
-      (t) =>
-        t.status === 'in_progress' &&
-        (linked.size === 0 ? t.category === goal.category : linked.has(t.id)),
-    )
-    setEditingId(null)
-    setLogGoalId(goal.id)
-    setLogError('')
-    setLogForm({
-      ...emptyLogForm(),
-      task_id: matches.length > 0 ? String(matches[0].id) : '',
-    })
-  }
-
-  function closeLog() {
-    setLogGoalId(null)
-    setLogForm(emptyLogForm())
-    setLogError('')
   }
 
   function buildPayload() {
@@ -288,7 +214,6 @@ export default function Goals() {
     try {
       await api.updateGoal(token, goal.id, { status: 'completed' })
       if (editingId === goal.id) resetEditor()
-      if (logGoalId === goal.id) closeLog()
       await load()
     } catch (err) {
       setError(err.message)
@@ -297,59 +222,9 @@ export default function Goals() {
     }
   }
 
-  async function onLogSubmit(e) {
-    e.preventDefault()
-    if (!logForm.task_id) {
-      setLogError('Link Board tasks to this goal, move one to In Progress, then log time.')
-      return
-    }
-    let duration = combineDuration(logForm.duration_hours, logForm.duration_minutes)
-    const body = {
-      task_id: Number(logForm.task_id),
-      notes: logForm.notes,
-      activity_date: logForm.activity_date,
-    }
-    if (isSleepLog) {
-      if (!logForm.sleep_start_time || !logForm.sleep_end_time) {
-        setLogError('Enter sleep start time and wake-up time.')
-        return
-      }
-      if (logForm.sleep_start_time === logForm.sleep_end_time) {
-        setLogError('Wake-up time must differ from sleep start time.')
-        return
-      }
-      duration = sleepDurationMinutes(logForm.sleep_start_time, logForm.sleep_end_time)
-      if (!duration || duration < 1) {
-        setLogError('Could not calculate sleep duration from those times.')
-        return
-      }
-      body.sleep_start_time = logForm.sleep_start_time
-      body.sleep_end_time = logForm.sleep_end_time
-    } else if (duration < 1) {
-      setLogError('Enter a duration of at least 1 minute.')
-      return
-    } else if (duration > 24 * 60) {
-      setLogError('Duration cannot exceed 24 hours.')
-      return
-    }
-    body.duration_minutes = duration
-    setLogBusy(true)
-    setLogError('')
-    try {
-      await api.createActivity(token, body)
-      closeLog()
-      await load()
-    } catch (err) {
-      setLogError(err.message)
-    } finally {
-      setLogBusy(false)
-    }
-  }
-
   async function remove(id) {
     await api.deleteGoal(token, id)
     if (editingId === id) resetEditor()
-    if (logGoalId === id) closeLog()
     await load()
   }
 
@@ -359,14 +234,14 @@ export default function Goals() {
         <div>
           <h1>Goals</h1>
           <p className="muted">
-            Link one or more Board tasks to a goal, log time on those tasks, then mark the goal
+            Link Board tasks to a goal, track progress from Activity logs, then mark the goal
             complete. Missed due dates fail automatically.
           </p>
         </div>
       </header>
 
-      <div className="grid-2">
-        <form className="panel stack" onSubmit={onSubmit}>
+      <div className="grid-2 goals-layout">
+        <form className="panel stack goals-editor" onSubmit={onSubmit}>
           <h2>{isEditing ? 'Edit goal' : 'New goal'}</h2>
           <label>
             Title
@@ -512,233 +387,118 @@ export default function Goals() {
           </div>
         </form>
 
-        <div className="panel stack">
+        <div className="panel goals-list-panel">
           <h2>Your goals</h2>
           {goals.length === 0 ? (
             <p className="muted">No goals yet. Create one and link Board tasks.</p>
           ) : (
-            <ul className="goal-manage-list">
+            <ul className="goal-manage-list goals-list-body">
               {goals.map((g) => {
                 const progress = progressForGoal(g, weekById, activities)
-                const isLogging = logGoalId === g.id
                 const status = g.status || (g.is_active ? 'active' : 'completed')
+                const colors = categoryColors(g.category)
+                const pct = Math.min(Math.round(progress.completion_pct || 0), 100)
+                const isActive = status === 'active'
+                const isEditingThis = editingId === g.id
                 return (
-                  <li key={g.id} className={`goal-manage-item status-${status}`}>
-                    <div className="goal-manage-head">
-                      <div>
-                        <div className="goal-title-row">
-                          <strong>{g.title}</strong>
-                          <span className={`goal-status-pill ${status}`}>{statusLabel(status)}</span>
-                        </div>
-                        <p className="muted">{formatGoalMeta(g)}</p>
-                        {(g.tasks || []).length > 0 && (
-                          <p className="muted" style={{ marginTop: 4 }}>
-                            Tasks:{' '}
-                            {g.tasks.map((t) => `PT-${t.id} ${t.title}`).join(' · ')}
-                          </p>
-                        )}
-                      </div>
-                      <div className="goal-manage-actions">
-                        {status === 'active' && (
-                          <>
-                            <button
-                              type="button"
-                              className="ghost-btn"
-                              onClick={() => startEdit(g)}
-                              disabled={busy}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost-btn"
-                              onClick={() => (isLogging ? closeLog() : openLog(g))}
-                              disabled={busy}
-                            >
-                              {isLogging ? 'Close' : 'Log time'}
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost-btn"
-                              onClick={() => completeGoal(g)}
-                              disabled={busy}
-                            >
-                              Complete
-                            </button>
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          className="ghost-btn"
-                          onClick={() => remove(g.id)}
-                          disabled={busy}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-
-                    {status === 'active' && (
-                      <>
-                        <div className="goal-meta" style={{ marginTop: 8 }}>
-                          <span className="muted">
-                            {progress.target_minutes
-                              ? `${progress.actual_minutes} / ${progress.target_minutes} min this week · ${Math.round(progress.completion_pct)}%`
-                              : `${progress.actual_minutes} min logged toward this goal`}
-                          </span>
-                        </div>
-                        {progress.target_minutes > 0 && (
-                          <div className="progress-track" style={{ marginTop: 8 }}>
-                            <div
-                              className="progress-fill"
-                              style={{ width: `${Math.min(progress.completion_pct, 100)}%` }}
-                            />
+                  <li
+                    key={g.id}
+                    className={`goal-manage-item status-${status}${isEditingThis ? ' is-editing' : ''}`}
+                    style={{ '--goal-accent': colors.fg }}
+                  >
+                    <div className="goal-card-accent" aria-hidden />
+                    <div className="goal-card-body">
+                      <div className="goal-card-top">
+                        <div className="goal-card-title-block">
+                          <div className="goal-title-row">
+                            <strong>{g.title}</strong>
+                            <span className={`goal-status-pill ${status}`}>
+                              {statusLabel(status)}
+                            </span>
                           </div>
-                        )}
-                      </>
-                    )}
-
-                    {status === 'failed' && (
-                      <p className="error" style={{ marginTop: 8 }}>
-                        Due date {g.end_date} was missed — this goal failed.
-                      </p>
-                    )}
-
-                    {isLogging && (
-                      <form className="stack goal-log-form" onSubmit={onLogSubmit}>
-                        <p className="muted" style={{ margin: 0 }}>
-                          Log against an <strong>In Progress</strong> task linked to this goal.
-                        </p>
-                        {matchingLogTasks.length === 0 ? (
-                          <p className="muted">
-                            {(g.task_ids || []).length === 0
-                              ? 'Associate Board tasks to this goal first (Edit).'
-                              : 'Move a linked task to In Progress on the Board, then log time.'}{' '}
-                            <Link to="/">Open Board</Link>
-                          </p>
-                        ) : (
-                          <label>
-                            Task
-                            <select
-                              value={logForm.task_id}
-                              onChange={(e) => setLogForm({ ...logForm, task_id: e.target.value })}
-                              required
+                          <div className="goal-card-tags">
+                            <span
+                              className="goal-cat-chip"
+                              style={{ background: colors.bg, color: colors.fg }}
                             >
-                              {matchingLogTasks.map((task) => (
-                                <option key={task.id} value={task.id}>
-                                  PT-{task.id} · {task.title}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                        <label>
-                          Date
-                          <input
-                            type="date"
-                            value={logForm.activity_date}
-                            onChange={(e) =>
-                              setLogForm({ ...logForm, activity_date: e.target.value })
-                            }
-                            required
-                          />
-                        </label>
-                        {!isSleepLog && (
-                          <div className="row-2">
-                            <label>
-                              Hours
-                              <input
-                                type="number"
-                                min={0}
-                                max={24}
-                                value={logForm.duration_hours}
-                                onChange={(e) =>
-                                  setLogForm({ ...logForm, duration_hours: e.target.value })
-                                }
-                                required
-                              />
-                            </label>
-                            <label>
-                              Minutes
-                              <input
-                                type="number"
-                                min={0}
-                                max={59}
-                                value={logForm.duration_minutes}
-                                onChange={(e) =>
-                                  setLogForm({ ...logForm, duration_minutes: e.target.value })
-                                }
-                                required
-                              />
-                            </label>
+                              {categoryLabel(g.category)}
+                            </span>
+                            <span className="goal-card-meta">{formatGoalMeta(g)}</span>
                           </div>
-                        )}
-                        {isSleepLog && (
-                          <>
-                            <div className="row-2">
-                              <label>
-                                Sleep start
-                                <input
-                                  type="time"
-                                  value={logForm.sleep_start_time}
-                                  onChange={(e) =>
-                                    setLogForm({
-                                      ...logForm,
-                                      sleep_start_time: e.target.value,
-                                    })
-                                  }
-                                  required
-                                />
-                              </label>
-                              <label>
-                                Wake up
-                                <input
-                                  type="time"
-                                  value={logForm.sleep_end_time}
-                                  onChange={(e) =>
-                                    setLogForm({ ...logForm, sleep_end_time: e.target.value })
-                                  }
-                                  required
-                                />
-                              </label>
+                        </div>
+                        <div className="goal-manage-actions">
+                          {isActive && (
+                            <>
+                              <button
+                                type="button"
+                                className="ghost-btn ghost-btn-sm"
+                                onClick={() => startEdit(g)}
+                                disabled={busy}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost-btn ghost-btn-sm ghost-btn-accent"
+                                onClick={() => completeGoal(g)}
+                                disabled={busy}
+                              >
+                                Complete
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            className="ghost-btn ghost-btn-sm ghost-btn-danger"
+                            onClick={() => remove(g.id)}
+                            disabled={busy}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      {(g.tasks || []).length > 0 && (
+                        <div className="goal-task-chips">
+                          {g.tasks.map((t) => (
+                            <span key={t.id} className="goal-task-chip">
+                              PT-{t.id} · {t.title}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {isActive && (
+                        <div className="goal-progress-block">
+                          <div className="goal-progress-stats">
+                            <span>
+                              {progress.target_minutes
+                                ? `${formatDuration(progress.actual_minutes)} / ${formatDuration(progress.target_minutes)}`
+                                : formatDuration(progress.actual_minutes)}
+                            </span>
+                            {progress.target_minutes > 0 ? (
+                              <span className="goal-progress-pct">{pct}%</span>
+                            ) : (
+                              <span className="muted">logged</span>
+                            )}
+                          </div>
+                          {progress.target_minutes > 0 && (
+                            <div className="progress-track">
+                              <div
+                                className="progress-fill"
+                                style={{ width: `${pct}%` }}
+                              />
                             </div>
-                            <p className="muted">
-                              Duration:{' '}
-                              <strong>
-                                {logSleepMinutes != null ? formatDuration(logSleepMinutes) : '—'}
-                              </strong>
-                              {logSleepQuality ? (
-                                <>
-                                  {' '}
-                                  · Quality:{' '}
-                                  <span
-                                    className="sleep-quality-badge"
-                                    style={{
-                                      background: logSleepStyle.bg,
-                                      color: logSleepStyle.fg,
-                                    }}
-                                  >
-                                    {SLEEP_QUALITY_LABEL[logSleepQuality]}
-                                  </span>
-                                </>
-                              ) : null}
-                            </p>
-                          </>
-                        )}
-                        <label>
-                          Notes{isSleepLog ? ' (optional)' : ''}
-                          <textarea
-                            rows={2}
-                            value={logForm.notes}
-                            onChange={(e) => setLogForm({ ...logForm, notes: e.target.value })}
-                          />
-                        </label>
-                        {logError && <p className="error">{logError}</p>}
-                        <button type="submit" disabled={logBusy || matchingLogTasks.length === 0}>
-                          {logBusy ? 'Saving…' : 'Save log'}
-                        </button>
-                      </form>
-                    )}
+                          )}
+                        </div>
+                      )}
+
+                      {status === 'failed' && (
+                        <p className="goal-failed-note">
+                          Due date {g.end_date} was missed — this goal failed.
+                        </p>
+                      )}
+                    </div>
                   </li>
                 )
               })}

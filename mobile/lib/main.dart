@@ -64,6 +64,7 @@ class PulseTrackApp extends StatelessWidget {
             title: 'Pulse Track',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.build(style),
+            themeAnimationDuration: Duration.zero,
             routerConfig: appRouter.router,
           );
         },

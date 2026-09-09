@@ -17,7 +17,6 @@ Pulse Track is a personal workspace for planned work, time logs, goals, and prog
 | **Goals** | Hour or due-date targets linked to Board tasks |
 | **Dashboard** | Period snapshot: stats, time/sleep charts, category mix, goal progress |
 | **Analytics** | Deeper time breakdown by category and task |
-| **API Docs** | Embedded Swagger UI for the REST API |
 | **Profile** | Display name, timezone, bio |
 
 **Categories** (used on tasks, logs, and goals): Health, Learning, Work, Sleep, Entertainment, Personal Technical Projects, AI Content Generation, Others.
@@ -34,7 +33,7 @@ Every main page shares the same frame.
 
 ### Sidebar
 
-- Navigate to **Board**, **Dashboard**, **Activities**, **Goals**, **Analytics**, **API Docs**, **Profile**
+- Navigate to **Board**, **Dashboard**, **Activities**, **Goals**, **Analytics**, **Profile**
 - See signed-in user (avatar + name/email)
 - **Sign out**
 
@@ -191,7 +190,7 @@ On create, if the selected task already has logs, a hint shows prior count and m
 
 ## Goals (`/goals`)
 
-Set targets, link Board tasks, log time, and mark goals complete. Missed due dates can mark a goal **Failed** (not editable afterward).
+Set targets, link Board tasks, and mark goals complete. Log time from **Activities**. Missed due dates can mark a goal **Failed** (not editable afterward).
 
 ### New goal / Edit goal (left panel)
 
@@ -213,9 +212,10 @@ Completed and failed goals cannot be edited.
 
 Each goal card shows:
 
-- Title and **status** — Active, Completed, Failed
-- Meta: category, hours/period or due date, linked task list
-- **Progress bar** — for active hour-based goals (weekly actual vs target)
+- Category accent bar + chip, title, and **status** (Active / Completed / Failed)
+- Meta: hours/period or due date, start date
+- Linked tasks as compact chips
+- **Progress** — hours logged vs target (and %) for active hour-based goals
 - Failed goals show a missed due-date message
 
 **Actions (active goals):**
@@ -223,11 +223,10 @@ Each goal card shows:
 | Action | Effect |
 |---|---|
 | Edit | Opens left panel with goal data |
-| Log time | Inline form: task, date, duration, notes |
 | Complete | Marks goal completed |
 | Delete | Removes goal |
 
-**Log time inline form:** only **In Progress** tasks linked to the goal (or same category if no tasks linked). Saves a new activity log. For Sleep tasks, uses sleep start/wake times and shows quality like Activities.
+Time logging for linked tasks is done on the **Activities** page.
 
 ---
 
@@ -296,16 +295,6 @@ Empty states when no data exists for the selected period.
 
 ---
 
-## API Docs (`/api-docs`)
-
-Interactive **Swagger UI** for the backend REST API (embedded from `{VITE_API_URL}/docs`).
-
-- Links to open Swagger, ReDoc, and OpenAPI JSON in a new tab
-- Use **Authorize** with a Firebase ID token, or `dev:<uid>` when `DEV_SKIP_AUTH=true`
-- Direct backend URLs: `/docs`, `/redoc`, `/openapi.json`
-
----
-
 ## Profile (`/profile`)
 
 Manage app profile (separate from Firebase account email).
@@ -352,7 +341,7 @@ The UI links related areas so users do not hunt for context:
 - **Panels** — bordered cards with subtle grid background
 - **Category colors** — consistent chips on Board and in lists (`frontend/src/constants.js`)
 - **Sleep quality colors** — Ideal green, Normal blue, Bad red on badges and Dashboard sleep bars
-- **Modals** — Board tasks and Activities use MUI dialogs; Goals uses inline expand for log time
+- **Modals** — Board tasks and Activities use MUI dialogs
 - **Motion** — page transitions and kanban card animations on Board
 - **Dashboard panels** — four chart/list panels share equal fixed height
 

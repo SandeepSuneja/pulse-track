@@ -45,7 +45,8 @@ class ShellScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Rebuild shell (and current branch) when appearance changes.
+    // Rebuild nav chrome when appearance changes. Tab bodies watch on their own
+    // (see [ThemeRebuild.watchAppearance]) so static AppTheme tokens update too.
     context.watch<ThemeController>();
     final p = context.pulse;
     return Scaffold(

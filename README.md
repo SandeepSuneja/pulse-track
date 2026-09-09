@@ -117,8 +117,6 @@ copy .env.example .env
 - ReDoc: http://127.0.0.1:8000/redoc
 - OpenAPI JSON: http://127.0.0.1:8000/openapi.json
 
-In the web app, open **API Docs** (`/api-docs`) for embedded Swagger.
-
 ### Frontend
 
 ```powershell
