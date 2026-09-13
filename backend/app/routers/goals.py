@@ -220,6 +220,9 @@ def delete_goal(
     goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == current_user.id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
+    _sync_status_flags(goal)
+    if goal.status == "failed":
+        raise HTTPException(status_code=400, detail="Failed goals cannot be deleted")
     db.query(Task).filter(Task.goal_id == goal.id, Task.user_id == current_user.id).update(
         {Task.goal_id: None}, synchronize_session=False
     )

@@ -610,7 +610,7 @@ class _TaskCard extends StatelessWidget {
                         _MetaRow(
                           icon: Icons.calendar_today_outlined,
                           text: 'Due ${formatShortDate(task.dueDate)}',
-                          color: overdue ? const Color(0xFFE11D48) : p.muted,
+                          color: overdue ? p.danger : p.warning,
                         )
                       else
                         _MetaRow(

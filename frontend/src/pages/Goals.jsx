@@ -30,17 +30,26 @@ function goalToForm(goal) {
   }
 }
 
+function isDeadlineGoal(goal) {
+  return goal.period === 'deadline' || (!goal.target_minutes && goal.end_date)
+}
+
 function formatGoalMeta(goal) {
   const bits = []
-  if (goal.period === 'deadline' || (!goal.target_minutes && goal.end_date)) {
-    bits.push(`Due ${goal.end_date}`)
-  } else if (goal.target_minutes) {
+  if (!isDeadlineGoal(goal) && goal.target_minutes) {
     const hours = goal.target_minutes / 60
     const hoursLabel = Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1)}h`
     bits.push(`${hoursLabel} / ${goal.period}`)
   }
   if (goal.start_date) bits.push(`Starts ${goal.start_date}`)
   return bits.join(' · ')
+}
+
+function isPastDue(isoDate) {
+  if (!isoDate) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return new Date(`${isoDate}T00:00:00`) < today
 }
 
 function statusLabel(status) {
@@ -51,7 +60,7 @@ function statusLabel(status) {
 
 function progressForGoal(goal, weekById, activities) {
   const linkedIds = new Set(goal.task_ids || [])
-  if (goal.period === 'deadline' || (!goal.target_minutes && goal.end_date)) {
+  if (isDeadlineGoal(goal)) {
     const start = goal.start_date || '1970-01-01'
     const end = goal.end_date || '9999-12-31'
     const actual = activities
@@ -222,10 +231,22 @@ export default function Goals() {
     }
   }
 
-  async function remove(id) {
-    await api.deleteGoal(token, id)
-    if (editingId === id) resetEditor()
-    await load()
+  async function remove(goal) {
+    if ((goal.status || (goal.is_active ? 'active' : 'completed')) === 'failed') {
+      setError('Failed goals cannot be deleted.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await api.deleteGoal(token, goal.id)
+      if (editingId === goal.id) resetEditor()
+      await load()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -423,7 +444,20 @@ export default function Goals() {
                             >
                               {categoryLabel(g.category)}
                             </span>
-                            <span className="goal-card-meta">{formatGoalMeta(g)}</span>
+                            {isDeadlineGoal(g) && g.end_date && (
+                              <span
+                                className={`goal-due-chip${
+                                  status === 'failed' || isPastDue(g.end_date)
+                                    ? ' is-overdue'
+                                    : ''
+                                }`}
+                              >
+                                Due {g.end_date}
+                              </span>
+                            )}
+                            {formatGoalMeta(g) ? (
+                              <span className="goal-card-meta">{formatGoalMeta(g)}</span>
+                            ) : null}
                           </div>
                         </div>
                         <div className="goal-manage-actions">
@@ -447,14 +481,16 @@ export default function Goals() {
                               </button>
                             </>
                           )}
-                          <button
-                            type="button"
-                            className="ghost-btn ghost-btn-sm ghost-btn-danger"
-                            onClick={() => remove(g.id)}
-                            disabled={busy}
-                          >
-                            Delete
-                          </button>
+                          {status !== 'failed' && (
+                            <button
+                              type="button"
+                              className="ghost-btn ghost-btn-sm ghost-btn-danger"
+                              onClick={() => remove(g)}
+                              disabled={busy}
+                            >
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </div>
 

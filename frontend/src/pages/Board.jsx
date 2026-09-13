@@ -531,9 +531,9 @@ export default function Board() {
                                   spacing={0.4}
                                   sx={{
                                     mt: 0.65,
-                                    color: overdue ? '#DC2626' : '#8BA3C7',
+                                    color: overdue ? '#FB7185' : '#FBBF24',
                                     fontSize: '0.72rem',
-                                    fontWeight: 650,
+                                    fontWeight: 700,
                                   }}
                                 >
                                   <EventOutlinedIcon sx={{ fontSize: 14 }} />

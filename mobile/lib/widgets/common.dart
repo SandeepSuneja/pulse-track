@@ -52,6 +52,104 @@ class ErrorView extends StatelessWidget {
   }
 }
 
+/// Due-date chip — amber when upcoming, rose when overdue/failed.
+class GoalDueChip extends StatelessWidget {
+  const GoalDueChip({
+    super.key,
+    required this.dueDate,
+    this.overdue = false,
+  });
+
+  final String dueDate;
+  final bool overdue;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pulse;
+    final fg = overdue ? p.danger : p.warning;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: fg.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: fg.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        'Due $dueDate',
+        style: TextStyle(
+          color: fg,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+/// Goal status pill — colors align with the web Goals page.
+class GoalStatusPill extends StatelessWidget {
+  const GoalStatusPill({super.key, required this.status});
+
+  final String status;
+
+  String get _label {
+    switch (status) {
+      case 'completed':
+        return 'Completed';
+      case 'failed':
+        return 'Failed';
+      default:
+        return 'Active';
+    }
+  }
+
+  (Color fg, Color bg, Color border) _colors(PulsePalette p) {
+    switch (status) {
+      case 'completed':
+        return (
+          p.success,
+          p.success.withValues(alpha: 0.12),
+          p.success.withValues(alpha: 0.35),
+        );
+      case 'failed':
+        return (
+          p.danger,
+          p.danger.withValues(alpha: 0.12),
+          p.danger.withValues(alpha: 0.35),
+        );
+      default:
+        return (
+          p.primary,
+          p.primary.withValues(alpha: 0.12),
+          p.primary.withValues(alpha: 0.35),
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pulse;
+    final (fg, bg, border) = _colors(p);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        _label.toUpperCase(),
+        style: TextStyle(
+          color: fg,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
 class CategoryChip extends StatelessWidget {
   const CategoryChip({super.key, required this.label, required this.fg, required this.bg});
 
