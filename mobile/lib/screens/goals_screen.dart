@@ -122,6 +122,13 @@ class _GoalsScreenState extends State<GoalsScreen> {
   }
 
   Future<void> _delete(GoalItem goal) async {
+    if (goal.status == 'failed') {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed goals cannot be deleted.')),
+      );
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -434,15 +441,15 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         })
                         .join(', ');
                 final metaBits = <String>[
-                  _statusLabel(g.status),
-                  if (g.isDeadline)
-                    'due ${g.endDate ?? '—'}'
-                  else if (g.targetMinutes != null)
+                  if (!g.isDeadline && g.targetMinutes != null)
                     '${formatDuration(g.targetMinutes!)} / ${g.period}',
                   if (g.startDate != null && g.startDate!.isNotEmpty)
                     'starts ${g.startDate}',
                 ];
                 final isActive = g.status == 'active';
+                final isFailed = g.status == 'failed';
+                final dueOverdue = isFailed ||
+                    (g.isDeadline && isOverdue(g.endDate, g.status));
                 final rowButtonStyle = OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(40),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -457,7 +464,11 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   clipBehavior: Clip.antiAlias,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: p.line),
+                    side: BorderSide(
+                      color: isFailed
+                          ? p.danger.withValues(alpha: 0.35)
+                          : p.line,
+                    ),
                   ),
                   child: IntrinsicHeight(
                     child: Row(
@@ -474,29 +485,57 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
-                                      child: Text(
-                                        g.title,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 16,
-                                          color: p.text,
-                                        ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Wrap(
+                                            crossAxisAlignment: WrapCrossAlignment.center,
+                                            spacing: 8,
+                                            runSpacing: 6,
+                                            children: [
+                                              Text(
+                                                g.title,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 16,
+                                                  color: p.text,
+                                                ),
+                                              ),
+                                              GoalStatusPill(status: g.status),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Wrap(
+                                            crossAxisAlignment: WrapCrossAlignment.center,
+                                            spacing: 8,
+                                            runSpacing: 6,
+                                            children: [
+                                              CategoryChip(
+                                                label: cat.label,
+                                                fg: cat.fg,
+                                                bg: cat.bg,
+                                              ),
+                                              if (g.isDeadline &&
+                                                  g.endDate != null &&
+                                                  g.endDate!.isNotEmpty)
+                                                GoalDueChip(
+                                                  dueDate: g.endDate!,
+                                                  overdue: dueOverdue,
+                                                ),
+                                              if (metaBits.isNotEmpty)
+                                                Text(
+                                                  metaBits.join(' · '),
+                                                  style: TextStyle(
+                                                    color: p.muted,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    CategoryChip(
-                                      label: cat.label,
-                                      fg: cat.fg,
-                                      bg: cat.bg,
-                                    ),
                                   ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  metaBits.join(' · '),
-                                  style: TextStyle(
-                                    color: p.muted,
-                                    fontSize: 12,
-                                  ),
                                 ),
                                 if (linkedTitles.isNotEmpty) ...[
                                   const SizedBox(height: 6),
@@ -509,7 +548,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                   ),
                                 ],
                                 const SizedBox(height: 10),
-                                if (progress.target > 0) ...[
+                                if (isActive && progress.target > 0) ...[
                                   LinearProgressIndicator(
                                     value: (progress.pct / 100).clamp(0, 1),
                                     color: cat.fg,
@@ -524,7 +563,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                       fontSize: 12,
                                     ),
                                   ),
-                                ] else ...[
+                                ] else if (isActive) ...[
                                   Text(
                                     'Logged ${formatDuration(progress.actual)}',
                                     style: TextStyle(
@@ -533,8 +572,19 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                     ),
                                   ),
                                 ],
-                                const SizedBox(height: 12),
-                                if (isActive)
+                                if (isFailed) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Due date ${g.endDate ?? '—'} was missed — this goal failed.',
+                                    style: TextStyle(
+                                      color: p.danger,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                                if (isActive) ...[
+                                  const SizedBox(height: 12),
                                   Row(
                                     children: [
                                       Expanded(
@@ -557,17 +607,21 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                       ),
                                     ],
                                   ),
-                                if (isActive) const SizedBox(height: 4),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: TextButton(
-                                    onPressed: () => _delete(g),
-                                    child: const Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.redAccent),
+                                ],
+                                if (!isFailed) ...[
+                                  if (isActive) const SizedBox(height: 4),
+                                  if (!isActive) const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: TextButton(
+                                      onPressed: () => _delete(g),
+                                      child: const Text(
+                                        'Delete',
+                                        style: TextStyle(color: Colors.redAccent),
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
