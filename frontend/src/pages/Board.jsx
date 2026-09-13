@@ -613,7 +613,7 @@ export default function Board() {
                               {ticket.activity_count || 0}{' '}
                               {(ticket.activity_count || 0) === 1 ? 'activity' : 'activities'}
                               {(ticket.logged_minutes || 0) > 0
-                                ? ` · ${ticket.logged_minutes} min`
+                                ? ` · ${formatDuration(ticket.logged_minutes)}`
                                 : ''}
                             </Typography>
                             <Box
