@@ -61,6 +61,10 @@ export default function Login() {
           <Link component={RouterLink} to="/register" underline="hover" fontWeight={700}>
             Create an account
           </Link>
+          {' · '}
+          <Link component={RouterLink} to="/privacy" underline="hover" fontWeight={700}>
+            Privacy
+          </Link>
         </>
       }
     >

@@ -77,18 +77,34 @@ class AuthService extends ChangeNotifier {
     if (err is GoogleSignInException) {
       switch (err.code) {
         case GoogleSignInExceptionCode.canceled:
-          return 'Google sign-in was cancelled.';
+          final detail = (err.description ?? '').trim();
+          if (detail.contains('16') ||
+              detail.toLowerCase().contains('reauth') ||
+              detail.toLowerCase().contains('activity is cancelled')) {
+            return 'Google Sign-In failed (often a SHA-1 mismatch on Play builds, '
+                'not a real cancel). Add the Play App Signing SHA-1 from '
+                'Play Console → Protected with Play → Manage Play app signing '
+                '(use Download certificates → deployment_cert.der if shown) '
+                'in Firebase, replace google-services.json, rebuild, and reupload.\n'
+                'Expected Play SHA-1 currently in google-services.json:\n'
+                '82:F0:60:D3:E4:25:26:76:DF:4D:9B:E1:60:48:07:85:C1:F3:9E:A1'
+                '${detail.isEmpty ? '' : '\n($detail)'}';
+          }
+          return detail.isEmpty
+              ? 'Google sign-in was cancelled.'
+              : 'Google sign-in was cancelled. ($detail)';
         case GoogleSignInExceptionCode.interrupted:
           return 'Google sign-in was interrupted. Try again.';
         case GoogleSignInExceptionCode.uiUnavailable:
           return 'Google sign-in UI is unavailable right now. Try again.';
         case GoogleSignInExceptionCode.clientConfigurationError:
         case GoogleSignInExceptionCode.providerConfigurationError:
-          return 'Google Sign-In is misconfigured for Android. '
-              'In Firebase Console → Project settings → Your Android app '
-              '(com.pulsetrack.pulse_track_mobile), add this debug SHA-1, '
-              'then download a fresh google-services.json:\n'
-              'C4:71:B5:D6:4C:2F:2A:13:9A:C5:AE:60:53:8F:60:D6:FA:91:00:CE'
+          return 'Google Sign-In is misconfigured for Android '
+              '(com.pulsetrack.pulse_track_mobile). In Firebase, add SHA-1s for '
+              'debug, upload, and Play App Signing keys, download a fresh '
+              'google-services.json, then rebuild/reupload the Play release.\n'
+              'Debug: C4:71:B5:D6:4C:2F:2A:13:9A:C5:AE:60:53:8F:60:D6:FA:91:00:CE\n'
+              'Upload: 7C:0B:A1:85:B3:32:1E:CF:9C:72:0A:51:4F:90:E5:A3:91:76:4A:80'
               '${err.description == null ? '' : '\n(${err.description})'}';
         default:
           return err.description ?? err.toString();
@@ -117,9 +133,12 @@ class AuthService extends ChangeNotifier {
     if (text.contains('10:') ||
         text.toLowerCase().contains('developer_error') ||
         text.toLowerCase().contains('api_exception: 10')) {
-      return 'Google Sign-In developer error. Add this debug SHA-1 in Firebase '
-          'for com.pulsetrack.pulse_track_mobile, then replace google-services.json:\n'
-          'C4:71:B5:D6:4C:2F:2A:13:9A:C5:AE:60:53:8F:60:D6:FA:91:00:CE';
+      return 'Google Sign-In developer error (API 10). Add debug + upload + '
+          'Play App Signing SHA-1s in Firebase for '
+          'com.pulsetrack.pulse_track_mobile, replace google-services.json, '
+          'then rebuild and reupload the Play AAB.\n'
+          'Debug: C4:71:B5:D6:4C:2F:2A:13:9A:C5:AE:60:53:8F:60:D6:FA:91:00:CE\n'
+          'Upload: 7C:0B:A1:85:B3:32:1E:CF:9C:72:0A:51:4F:90:E5:A3:91:76:4A:80';
     }
     return text;
   }
@@ -207,6 +226,7 @@ class AuthService extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
+      // Native account picker (Credential Manager) — not the browser OAuth sheet.
       await _ensureGoogleInitialized();
       final googleUser = await GoogleSignIn.instance.authenticate(
         scopeHint: const ['email', 'profile'],

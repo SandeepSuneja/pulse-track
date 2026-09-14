@@ -8,6 +8,7 @@ import Board from './pages/Board'
 import Dashboard from './pages/Dashboard'
 import Goals from './pages/Goals'
 import Login from './pages/Login'
+import Privacy from './pages/Privacy'
 import Profile from './pages/Profile'
 import Register from './pages/Register'
 
@@ -51,6 +52,7 @@ function GuestOnly({ children }) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/privacy" element={<Privacy />} />
       <Route
         path="/login"
         element={
