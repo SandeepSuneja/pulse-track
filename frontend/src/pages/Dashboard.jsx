@@ -14,7 +14,7 @@ import {
 } from 'recharts'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
-import { categoryChartColor, categoryLabel } from '../constants'
+import { useCategories } from '../CategoryContext'
 import {
   SLEEP_QUALITY_CHART_COLOR,
   SLEEP_QUALITY_LABEL,
@@ -33,6 +33,7 @@ function sleepHoursLabel(mins) {
 
 export default function Dashboard() {
   const { token } = useAuth()
+  const { categoryChartColor, categoryLabel } = useCategories()
   const [period, setPeriod] = useState('week')
   const [data, setData] = useState(null)
   const [error, setError] = useState('')

@@ -16,7 +16,7 @@ Personal workspace for planned work, time logs, goals, and progress charts.
 | **Profile** | Display name, bio, timezone. Mobile also has **Appearance** (Light / Dark / Web themes). |
 | **Mobile** | Flutter Android/iOS client with the same product flow and shared API. |
 
-Categories: health, learning, work, sleep, entertainment, personal technical projects, AI content generation, others.
+Categories: health, work, entertainment, sleep, others, plus user-defined custom categories.
 
 **Sleep quality:** Ideal (wake 06:00–06:30 and ≥ 7h), Normal (wake 06:30–07:30 and ≥ 7h), or Bad otherwise.
 

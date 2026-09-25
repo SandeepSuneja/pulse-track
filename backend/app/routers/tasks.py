@@ -5,6 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user
+from app.categories import assert_valid_category
 from app.database import get_db
 from app.models import Activity, Goal, Task, User
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
@@ -97,6 +98,7 @@ def create_task(
     current_user: User = Depends(get_current_user),
 ) -> TaskOut:
     data = payload.model_dump()
+    assert_valid_category(db, current_user.id, data.get("category"))
     _validate_goal_id(db, current_user.id, data.get("goal_id"))
     task = Task(user_id=current_user.id, **data)
     db.add(task)
@@ -144,6 +146,8 @@ def update_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     updates = payload.model_dump(exclude_unset=True)
+    if "category" in updates:
+        assert_valid_category(db, current_user.id, updates.get("category"))
     if "goal_id" in updates:
         _validate_goal_id(db, current_user.id, updates.get("goal_id"))
     for key, value in updates.items():

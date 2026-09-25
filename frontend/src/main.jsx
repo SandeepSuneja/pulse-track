@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { AuthProvider } from './AuthContext'
+import { CategoryProvider } from './CategoryContext'
 import App from './App.jsx'
 import theme from './theme'
 import './index.css'
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')).render(
       <CssBaseline />
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <CategoryProvider>
+            <App />
+          </CategoryProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

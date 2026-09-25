@@ -15,7 +15,11 @@ class Settings(BaseSettings):
     # Local default is SQLite. Production (RDS) example:
     # postgresql+psycopg2://USER:PASSWORD@HOST:5432/pulsetrack
     database_url: str = "sqlite:///./pulse_track.db"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = (
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:5174,http://127.0.0.1:5174,"
+        "http://localhost:5175,http://127.0.0.1:5175"
+    )
 
     firebase_project_id: str = ""
     firebase_private_key_id: str = ""

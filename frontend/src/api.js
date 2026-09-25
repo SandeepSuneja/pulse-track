@@ -58,4 +58,13 @@ export const api = {
   updateGoal: (token, id, body) => request(`/api/goals/${id}`, { method: 'PATCH', token, body }),
   deleteGoal: (token, id) => request(`/api/goals/${id}`, { method: 'DELETE', token }),
   analytics: (token, period = 'week') => request(`/api/analytics/summary?period=${period}`, { token }),
+
+  listCategories: (token) => request('/api/categories', { token }),
+  listCustomCategories: (token) => request('/api/categories/custom', { token }),
+  createCategory: (token, body) =>
+    request('/api/categories/custom', { method: 'POST', token, body }),
+  updateCategory: (token, id, body) =>
+    request(`/api/categories/custom/${id}`, { method: 'PATCH', token, body }),
+  deleteCategory: (token, id) =>
+    request(`/api/categories/custom/${id}`, { method: 'DELETE', token }),
 }

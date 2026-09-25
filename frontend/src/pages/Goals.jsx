@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
-import { CATEGORIES, categoryColors, categoryLabel } from '../constants'
+import { useCategories } from '../CategoryContext'
+import CategoryFormDialog from '../components/CategoryFormDialog'
+import ManageCategoriesDialog from '../components/ManageCategoriesDialog'
 import { formatDuration } from '../duration'
 
 const emptyForm = () => ({
@@ -84,6 +86,7 @@ function progressForGoal(goal, weekById, activities) {
 
 export default function Goals() {
   const { token } = useAuth()
+  const { categories, categoryColors, categoryLabel } = useCategories()
   const [goals, setGoals] = useState([])
   const [allTasks, setAllTasks] = useState([])
   const [activities, setActivities] = useState([])
@@ -92,6 +95,8 @@ export default function Goals() {
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [createCategoryOpen, setCreateCategoryOpen] = useState(false)
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false)
 
   const isEditing = editingId != null
   const editingGoal = useMemo(
@@ -276,22 +281,33 @@ export default function Goals() {
             Category
             <select
               value={form.category}
-              onChange={(e) =>
+              onChange={(e) => {
+                const category = e.target.value
+                if (category === '__create__') {
+                  setCreateCategoryOpen(true)
+                  return
+                }
+                if (category === '__manage__') {
+                  setManageCategoriesOpen(true)
+                  return
+                }
                 setForm({
                   ...form,
-                  category: e.target.value,
+                  category,
                   task_ids: form.task_ids.filter((id) => {
                     const task = allTasks.find((t) => String(t.id) === id)
-                    return task && task.category === e.target.value
+                    return task && task.category === category
                   }),
                 })
-              }
+              }}
             >
-              {CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.label}
                 </option>
               ))}
+              <option value="__create__">+ Create category…</option>
+              <option value="__manage__">Manage categories…</option>
             </select>
           </label>
 
@@ -542,6 +558,19 @@ export default function Goals() {
           )}
         </div>
       </div>
+
+      <CategoryFormDialog
+        open={createCategoryOpen}
+        mode="create"
+        onClose={() => setCreateCategoryOpen(false)}
+        onSaved={(slug) => {
+          setForm((prev) => ({ ...prev, category: slug, task_ids: [] }))
+        }}
+      />
+      <ManageCategoriesDialog
+        open={manageCategoriesOpen}
+        onClose={() => setManageCategoriesOpen(false)}
+      />
     </div>
   )
 }

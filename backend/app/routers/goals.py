@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user
+from app.categories import assert_valid_category
 from app.database import get_db
 from app.models import Goal, Task, User
 from app.schemas import GoalCreate, GoalOut, GoalTaskBrief, GoalUpdate
@@ -121,6 +122,7 @@ def create_goal(
     data = payload.model_dump()
     task_ids = data.pop("task_ids", []) or []
     data.pop("is_active", None)
+    assert_valid_category(db, current_user.id, data.get("category"))
     goal = Goal(user_id=current_user.id, status="active", is_active=1, **data)
     db.add(goal)
     db.flush()
@@ -190,6 +192,9 @@ def update_goal(
         k in data for k in ("title", "category", "target_minutes", "period", "start_date", "end_date")
     ):
         raise HTTPException(status_code=400, detail="Only active goals can be edited")
+
+    if "category" in data:
+        assert_valid_category(db, current_user.id, data.get("category"))
 
     for key, value in data.items():
         setattr(goal, key, value)

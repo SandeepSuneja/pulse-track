@@ -11,6 +11,7 @@ from sqlalchemy import (
     String,
     Text,
     Time,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -37,6 +38,25 @@ class User(Base):
     tasks: Mapped[list[Task]] = relationship(back_populates="user", cascade="all, delete-orphan")
     activities: Mapped[list[Activity]] = relationship(back_populates="user", cascade="all, delete-orphan")
     goals: Mapped[list[Goal]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    custom_categories: Mapped[list[CustomCategory]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class CustomCategory(Base):
+    """User-defined category with a custom color (id = slug)."""
+
+    __tablename__ = "custom_categories"
+    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_custom_categories_user_slug"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    slug: Mapped[str] = mapped_column(String(64), index=True)
+    label: Mapped[str] = mapped_column(String(80))
+    color: Mapped[str] = mapped_column(String(7), default="#94A3B8")  # #RRGGBB
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="custom_categories")
 
 
 class Task(Base):
@@ -51,8 +71,7 @@ class Task(Base):
     )
     title: Mapped[str] = mapped_column(String(200))
     category: Mapped[str] = mapped_column(String(80), index=True)
-    # health | learning | work | sleep | entertainment |
-    # personal_technical_projects | ai_content_generation | others
+    # Built-in or custom slug (see custom_categories)
     status: Mapped[str] = mapped_column(String(20), default="todo", index=True)
     # todo | in_progress | completed
     notes: Mapped[str] = mapped_column(Text, default="")

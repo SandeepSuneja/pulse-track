@@ -14,7 +14,7 @@ import {
 } from 'recharts'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
-import { CATEGORIES, categoryChartColor, categoryLabel } from '../constants'
+import { useCategories } from '../CategoryContext'
 import { formatDuration } from '../duration'
 
 function hoursLabel(mins) {
@@ -25,8 +25,8 @@ function hoursLabel(mins) {
   return `${mins}m`
 }
 
-function sortCategoryIds(ids) {
-  const order = CATEGORIES.map((c) => c.id)
+function sortCategoryIds(ids, categories) {
+  const order = categories.map((c) => c.id)
   return [...ids].sort((a, b) => {
     const ia = order.indexOf(a)
     const ib = order.indexOf(b)
@@ -58,6 +58,7 @@ function flattenSeriesPoint(point) {
 
 export default function Analytics() {
   const { token } = useAuth()
+  const { categories, categoryChartColor, categoryLabel } = useCategories()
   const [period, setPeriod] = useState('month')
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -101,10 +102,10 @@ export default function Analytics() {
         keys.add(item.category)
       }
     }
-    return sortCategoryIds([...keys]).filter((key) =>
+    return sortCategoryIds([...keys], categories).filter((key) =>
       chartData.some((row) => Object.prototype.hasOwnProperty.call(row, key)),
     )
-  }, [chartData, data])
+  }, [chartData, data, categories])
 
   const useCategoryLines = categoryKeys.length > 0
   const chartHasData = chartData.some((row) => {

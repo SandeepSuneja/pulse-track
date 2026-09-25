@@ -22,7 +22,9 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
-import { CATEGORIES, categoryColors, categoryLabel } from '../constants'
+import { useCategories } from '../CategoryContext'
+import CategoryFormDialog from '../components/CategoryFormDialog'
+import ManageCategoriesDialog from '../components/ManageCategoriesDialog'
 import { formatDuration } from '../duration'
 
 const TASK_SECTIONS = [
@@ -132,6 +134,7 @@ function Field({ children }) {
 
 export default function Board() {
   const { token } = useAuth()
+  const { categories, categoryColors, categoryLabel } = useCategories()
   const [items, setItems] = useState([])
   const [goals, setGoals] = useState([])
   const [error, setError] = useState('')
@@ -145,6 +148,8 @@ export default function Board() {
   const [activitiesLoading, setActivitiesLoading] = useState(false)
   const [dialogSection, setDialogSection] = useState('details')
   const [categoryMenuWidth, setCategoryMenuWidth] = useState(null)
+  const [createCategoryOpen, setCreateCategoryOpen] = useState(false)
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false)
   const categoryFieldRef = useRef(null)
   const suppressClickRef = useRef(false)
 
@@ -952,6 +957,14 @@ export default function Board() {
                       value={form.category}
                       onChange={(e) => {
                         const category = e.target.value
+                        if (category === '__create__') {
+                          setCreateCategoryOpen(true)
+                          return
+                        }
+                        if (category === '__manage__') {
+                          setManageCategoriesOpen(true)
+                          return
+                        }
                         const linked = activeGoals.find((g) => String(g.id) === String(form.goal_id))
                         const stillValid = linked && linked.category === category
                         setForm({
@@ -1008,7 +1021,7 @@ export default function Board() {
                         },
                       }}
                     >
-                      {CATEGORIES.map((c) => {
+                      {categories.map((c) => {
                         const colors = categoryColors(c.id)
                         return (
                           <MenuItem key={c.id} value={c.id} sx={{ gap: 1.25, borderRadius: '8px', mx: 0.5 }}>
@@ -1025,6 +1038,12 @@ export default function Board() {
                           </MenuItem>
                         )
                       })}
+                      <MenuItem value="__create__" sx={{ gap: 1.25, borderRadius: '8px', mx: 0.5, color: '#22D3EE' }}>
+                        + Create category…
+                      </MenuItem>
+                      <MenuItem value="__manage__" sx={{ gap: 1.25, borderRadius: '8px', mx: 0.5, color: '#8BA3C7' }}>
+                        Manage categories…
+                      </MenuItem>
                     </TextField>
                   </Field>
 
@@ -1168,6 +1187,19 @@ export default function Board() {
           </DialogActions>
         </Box>
       </Dialog>
+
+      <CategoryFormDialog
+        open={createCategoryOpen}
+        mode="create"
+        onClose={() => setCreateCategoryOpen(false)}
+        onSaved={(slug) => {
+          setForm((prev) => ({ ...prev, category: slug, goal_id: '' }))
+        }}
+      />
+      <ManageCategoriesDialog
+        open={manageCategoriesOpen}
+        onClose={() => setManageCategoriesOpen(false)}
+      />
     </Box>
   )
 }

@@ -32,20 +32,9 @@ class UserOut(UserBase):
 
 
 TASK_STATUSES = ("todo", "in_progress", "completed")
-TASK_CATEGORIES = (
-    "health",
-    "learning",
-    "work",
-    "sleep",
-    "entertainment",
-    "personal_technical_projects",
-    "ai_content_generation",
-    "others",
-)
-CATEGORY_PATTERN = (
-    "^(health|learning|work|sleep|entertainment|"
-    "personal_technical_projects|ai_content_generation|others)$"
-)
+# Built-in + custom slugs: lowercase letter, then letters/digits/underscore.
+CATEGORY_PATTERN = r"^[a-z][a-z0-9_]{0,63}$"
+COLOR_PATTERN = r"^#[0-9A-Fa-f]{6}$"
 STATUS_PATTERN = "^(todo|in_progress|completed)$"
 
 
@@ -243,3 +232,34 @@ class AnalyticsSummary(BaseModel):
     category_minutes_over_time: list[CategoryTimeSeriesPoint] = []
     sleep_over_time: list[SleepTimeSeriesPoint] = []
     goal_progress: list[dict]
+
+
+class CustomCategoryCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    color: str = Field(pattern=COLOR_PATTERN)
+    slug: Optional[str] = Field(default=None, pattern=CATEGORY_PATTERN)
+
+
+class CustomCategoryUpdate(BaseModel):
+    label: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    color: Optional[str] = Field(default=None, pattern=COLOR_PATTERN)
+
+
+class CustomCategoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    slug: str
+    label: str
+    color: str
+    created_at: datetime
+
+
+class CategoryOptionOut(BaseModel):
+    """Built-in or custom category for pickers."""
+
+    id: str
+    label: str
+    color: str
+    builtin: bool
+

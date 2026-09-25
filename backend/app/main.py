@@ -6,10 +6,11 @@ from fastapi.openapi.utils import get_openapi
 from sqlalchemy import text
 
 from app.auth import init_firebase
+from app.categories import ensure_legacy_custom_categories
 from app.config import get_settings
 from app.database import Base, SessionLocal, engine
-from app.models import Activity, Task
-from app.routers import activities, analytics, goals, tasks, users
+from app.models import Activity, CustomCategory, Task
+from app.routers import activities, analytics, categories, goals, tasks, users
 
 
 API_DESCRIPTION = """
@@ -42,6 +43,7 @@ OPENAPI_TAGS = [
     {"name": "activities", "description": "Time logs, including sleep start/wake"},
     {"name": "goals", "description": "Hour or due-date goals linked to tasks"},
     {"name": "analytics", "description": "Period summaries, charts, sleep-by-day"},
+    {"name": "categories", "description": "Built-in and custom categories"},
     {"name": "health", "description": "Liveness check (no auth)"},
 ]
 
@@ -253,6 +255,11 @@ async def lifespan(_app: FastAPI):
         ensure_sqlite_schema()
     else:
         ensure_activity_sleep_columns()
+    db = SessionLocal()
+    try:
+        ensure_legacy_custom_categories(db)
+    finally:
+        db.close()
     try:
         init_firebase(settings)
     except RuntimeError:
@@ -281,6 +288,8 @@ settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
+    # Local Vite may hop ports (5173, 5174, …) when older instances linger.
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -291,6 +300,7 @@ app.include_router(tasks.router, prefix="/api")
 app.include_router(activities.router, prefix="/api")
 app.include_router(goals.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
+app.include_router(categories.router, prefix="/api")
 
 
 @app.get("/api/health", tags=["health"], summary="Health check")

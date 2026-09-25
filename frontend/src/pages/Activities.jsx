@@ -13,7 +13,7 @@ import AddIcon from '@mui/icons-material/Add'
 import CloseIcon from '@mui/icons-material/Close'
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
-import { CATEGORIES, categoryLabel } from '../constants'
+import { useCategories } from '../CategoryContext'
 import {
   SLEEP_QUALITY_LABEL,
   SLEEP_QUALITY_STYLE,
@@ -56,6 +56,7 @@ function SleepQualityBadge({ quality }) {
 
 export default function Activities() {
   const { token } = useAuth()
+  const { categories, categoryLabel } = useCategories()
   const [items, setItems] = useState([])
   const [tasks, setTasks] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -337,7 +338,7 @@ export default function Activities() {
               onChange={(e) => setFilter('category', e.target.value)}
             >
               <option value="">All categories</option>
-              {CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.label}
                 </option>
