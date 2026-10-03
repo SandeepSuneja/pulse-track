@@ -151,6 +151,7 @@ class GoalItem {
     this.startDate,
     this.endDate,
     this.isActive = true,
+    this.completionPct = 0,
     this.taskIds = const [],
     this.tasks = const [],
   });
@@ -164,10 +165,28 @@ class GoalItem {
   final String? startDate;
   final String? endDate;
   final bool isActive;
+  final int completionPct;
   final List<int> taskIds;
   final List<GoalTaskRef> tasks;
 
   bool get isDeadline => period == 'deadline' || (targetMinutes == null && endDate != null);
+
+  GoalItem copyWith({int? completionPct}) {
+    return GoalItem(
+      id: id,
+      title: title,
+      category: category,
+      period: period,
+      status: status,
+      targetMinutes: targetMinutes,
+      startDate: startDate,
+      endDate: endDate,
+      isActive: isActive,
+      completionPct: completionPct ?? this.completionPct,
+      taskIds: taskIds,
+      tasks: tasks,
+    );
+  }
 
   factory GoalItem.fromJson(Map<String, dynamic> json) {
     final rawIds = json['task_ids'];
@@ -182,6 +201,11 @@ class GoalItem {
       startDate: json['start_date'] as String?,
       endDate: json['end_date'] as String?,
       isActive: json['is_active'] == true || json['is_active'] == 1,
+      completionPct: () {
+        final raw = json['completion_pct'] as num?;
+        if (raw == null) return 0;
+        return raw.round().clamp(0, 100);
+      }(),
       taskIds: rawIds is List
           ? rawIds.map((e) => e as int).toList()
           : const <int>[],

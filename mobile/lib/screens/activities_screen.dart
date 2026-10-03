@@ -679,9 +679,14 @@ class _ActivityCard extends StatelessWidget {
 
     return Material(
       color: p.panel,
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: p.line),
+        side: BorderSide(
+          color: cat.fg.withValues(alpha: 0.88),
+          width: 2.75,
+        ),
       ),
       child: InkWell(
         onTap: onTap,
@@ -691,80 +696,80 @@ class _ActivityCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Text(
-                    ticket,
-                    style: TextStyle(
-                      color: p.primary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6),
-                    child: Text('·', style: TextStyle(color: p.muted)),
-                  ),
-                  Text(
-                    formatShortDate(item.activityDate),
-                    style: TextStyle(
-                      color: p.muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const Spacer(),
-                  CategoryChip(label: cat.label, fg: cat.fg, bg: cat.bg),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                item.title.isEmpty ? 'Activity' : item.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15,
-                  color: p.text,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: notes.isEmpty
-                        ? const SizedBox.shrink()
-                        : Text(
-                            notes,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Text(
+                            ticket,
                             style: TextStyle(
-                              color: p.muted,
-                              fontSize: 13,
+                              color: p.primary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
                             ),
                           ),
-                  ),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: p.line),
-                    ),
-                    child: Text(
-                      formatDuration(item.durationMinutes),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                        color: p.text,
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Text('·', style: TextStyle(color: p.muted)),
+                          ),
+                          Text(
+                            formatShortDate(item.activityDate),
+                            style: TextStyle(
+                              color: p.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          CategoryChip(label: cat.label, fg: cat.fg, bg: cat.bg),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Text(
+                        item.title.isEmpty ? 'Activity' : item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: p.text,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: notes.isEmpty
+                                ? const SizedBox.shrink()
+                                : Text(
+                                    notes,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: p.muted,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: p.line),
+                            ),
+                            child: Text(
+                              formatDuration(item.durationMinutes),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
+                                color: p.text,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ],
-          ),
         ),
       ),
     );

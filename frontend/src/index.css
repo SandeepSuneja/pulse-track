@@ -1254,6 +1254,18 @@ button:not(.MuiButtonBase-root):disabled {
   border-radius: 999px;
 }
 
+.goal-progress-slider {
+  width: 100%;
+  margin: 4px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.goal-progress-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .avg-grid {
   list-style: none;
   margin: 0;

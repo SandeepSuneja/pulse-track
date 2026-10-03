@@ -164,6 +164,7 @@ class GoalUpdate(BaseModel):
     end_date: date | None = None
     status: Optional[str] = Field(default=None, pattern="^(active|completed|failed)$")
     is_active: Optional[bool] = None
+    completion_pct: Optional[int] = Field(default=None, ge=0, le=100)
     task_ids: Optional[list[int]] = None
 
 
@@ -180,6 +181,7 @@ class GoalOut(BaseModel):
     end_date: date | None
     status: str
     is_active: bool
+    completion_pct: int = 0
     created_at: datetime
     task_ids: list[int] = Field(default_factory=list)
     tasks: list[GoalTaskBrief] = Field(default_factory=list)

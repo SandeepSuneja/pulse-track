@@ -24,7 +24,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late AnalyticsRange _range;
-  late Future<AnalyticsSummary> _future;
+  late Future<({AnalyticsSummary summary, List<GoalItem> goals})> _future;
 
   @override
   void initState() {
@@ -37,13 +37,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _future = _load();
   }
 
-  Future<AnalyticsSummary> _load() {
+  Future<({AnalyticsSummary summary, List<GoalItem> goals})> _load() async {
     final q = _range.apiQuery;
-    return context.read<AuthService>().api.analytics(
-          period: q.period,
-          startDate: q.start,
-          endDate: q.end,
-        );
+    final api = context.read<AuthService>().api;
+    final results = await Future.wait([
+      api.analytics(
+        period: q.period,
+        startDate: q.start,
+        endDate: q.end,
+      ),
+      api.listGoals(),
+    ]);
+    return (
+      summary: results[0] as AnalyticsSummary,
+      goals: results[1] as List<GoalItem>,
+    );
   }
 
   Future<void> _refresh() async {
@@ -90,7 +98,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onChanged: _onRangeChanged,
           ),
           Expanded(
-            child: FutureBuilder<AnalyticsSummary>(
+            child: FutureBuilder<({AnalyticsSummary summary, List<GoalItem> goals})>(
               future: _future,
               builder: (context, snap) {
                 if (snap.connectionState != ConnectionState.done) {
@@ -99,7 +107,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 if (snap.hasError) {
                   return ErrorView(message: snap.error.toString(), onRetry: _refresh);
                 }
-                final data = snap.data!;
+                final payload = snap.data!;
+                final data = payload.summary;
+                final goalsById = {for (final g in payload.goals) g.id: g};
                 final timeBars = prepareMinutesChart(
                   data.minutesOverTime,
                   period: chartPeriod,
@@ -245,18 +255,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ListTile(
                                       contentPadding: EdgeInsets.zero,
                                       title: Text(g.title),
-                                      subtitle: Text(
-                                        g.targetMinutes > 0
-                                            ? '${g.actualMinutes}/${g.targetMinutes} min · ${g.completionPct.round()}%'
-                                            : '${g.actualMinutes} min logged',
-                                      ),
                                     ),
-                                    if (g.targetMinutes > 0)
-                                      LinearProgressIndicator(
-                                        value: (g.completionPct / 100).clamp(0, 1),
-                                        color: categoryOf(g.category).fg,
-                                        backgroundColor: AppTheme.line,
-                                      ),
+                                    Builder(
+                                      builder: (context) {
+                                        final goal = goalsById[g.goalId];
+                                        final pct = goal?.completionPct ?? 0;
+                                        final cat = categoryOf(g.category);
+                                        return _DashboardGoalProgress(
+                                          completionPct: pct,
+                                          accent: cat.fg,
+                                          status: goal?.status ?? 'active',
+                                        );
+                                      },
+                                    ),
                                     const SizedBox(height: 8),
                                   ],
                                 ],
@@ -644,6 +655,62 @@ class _StatTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DashboardGoalProgress extends StatelessWidget {
+  const _DashboardGoalProgress({
+    required this.completionPct,
+    required this.accent,
+    required this.status,
+  });
+
+  final int completionPct;
+  final Color accent;
+  final String status;
+
+  Color get _fillColor {
+    if (status == 'completed') return const Color(0xFF34D399);
+    if (status == 'failed') return const Color(0xFFFB7185);
+    return accent;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = completionPct.clamp(0, 100);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Task completion',
+              style: TextStyle(color: AppTheme.muted, fontSize: 12),
+            ),
+            Text(
+              '$pct%',
+              style: TextStyle(
+                color: accent,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: pct / 100,
+            minHeight: 8,
+            color: _fillColor,
+            backgroundColor: AppTheme.line,
+          ),
+        ),
+      ],
     );
   }
 }
