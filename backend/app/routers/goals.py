@@ -76,6 +76,7 @@ def _goal_to_out(goal: Goal) -> GoalOut:
         end_date=goal.end_date,
         status=goal.status or ("active" if goal.is_active else "completed"),
         is_active=bool(goal.is_active),
+        completion_pct=max(0, min(int(goal.completion_pct or 0), 100)),
         created_at=goal.created_at,
         task_ids=[t.id for t in tasks],
         tasks=[
@@ -144,9 +145,6 @@ def update_goal(
     data = payload.model_dump(exclude_unset=True)
     task_ids = data.pop("task_ids", None)
 
-    if goal.status == "failed":
-        raise HTTPException(status_code=400, detail="Failed goals cannot be edited")
-
     if "end_date" in data:
         if goal.end_date is not None and data["end_date"] != goal.end_date:
             raise HTTPException(
@@ -162,8 +160,8 @@ def update_goal(
     if "status" in data:
         new_status = data["status"]
         if new_status == "completed":
-            if goal.status != "active":
-                raise HTTPException(status_code=400, detail="Only active goals can be completed")
+            if goal.status == "active":
+                goal.completion_pct = 100
             goal.status = "completed"
             goal.is_active = 0
             data.pop("status")
@@ -174,24 +172,17 @@ def update_goal(
             data.pop("status")
             data.pop("is_active", None)
         elif new_status == "active":
-            raise HTTPException(status_code=400, detail="Cannot reopen a goal as active")
+            goal.status = "active"
+            goal.is_active = 1
+            data.pop("status")
+            data.pop("is_active", None)
         else:
             raise HTTPException(status_code=400, detail="Invalid goal status")
 
     if "is_active" in data:
-        # Legacy flag — map onto status when status wasn't explicitly set
         active = bool(data.pop("is_active"))
-        if active and goal.status != "active":
-            raise HTTPException(status_code=400, detail="Cannot reactivate a closed goal")
-        if not active and goal.status == "active":
-            goal.status = "completed"
-            goal.is_active = 0
-
-    # Closed goals: only allow task association tweaks? Prefer block most edits
-    if goal.status != "active" and any(
-        k in data for k in ("title", "category", "target_minutes", "period", "start_date", "end_date")
-    ):
-        raise HTTPException(status_code=400, detail="Only active goals can be edited")
+        goal.status = "active" if active else "completed"
+        goal.is_active = 1 if active else 0
 
     if "category" in data:
         assert_valid_category(db, current_user.id, data.get("category"))
@@ -208,8 +199,6 @@ def update_goal(
     db.add(goal)
 
     if task_ids is not None:
-        if goal.status != "active":
-            raise HTTPException(status_code=400, detail="Cannot change tasks on a closed goal")
         _sync_goal_tasks(db, goal, task_ids, current_user.id)
 
     db.commit()
@@ -226,8 +215,11 @@ def delete_goal(
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
     _sync_status_flags(goal)
-    if goal.status == "failed":
-        raise HTTPException(status_code=400, detail="Failed goals cannot be deleted")
+    if goal.status in ("failed", "completed"):
+        raise HTTPException(
+            status_code=400,
+            detail="Completed and failed goals cannot be deleted",
+        )
     db.query(Task).filter(Task.goal_id == goal.id, Task.user_id == current_user.id).update(
         {Task.goal_id: None}, synchronize_session=False
     )

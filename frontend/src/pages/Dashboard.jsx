@@ -15,6 +15,7 @@ import {
 import { api } from '../api'
 import { useAuth } from '../AuthContext'
 import { useCategories } from '../CategoryContext'
+import GoalProgressBar from '../components/GoalProgressBar'
 import {
   SLEEP_QUALITY_CHART_COLOR,
   SLEEP_QUALITY_LABEL,
@@ -36,15 +37,23 @@ export default function Dashboard() {
   const { categoryChartColor, categoryLabel } = useCategories()
   const [period, setPeriod] = useState('week')
   const [data, setData] = useState(null)
+  const [goals, setGoals] = useState([])
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!token) return
-    api
-      .analytics(token, period)
-      .then(setData)
+    Promise.all([api.analytics(token, period), api.listGoals(token)])
+      .then(([summary, goalList]) => {
+        setData(summary)
+        setGoals(goalList)
+      })
       .catch((err) => setError(err.message))
   }, [token, period])
+
+  const goalsById = useMemo(
+    () => Object.fromEntries((goals || []).map((g) => [g.id, g])),
+    [goals],
+  )
 
   const sleepChartData = useMemo(() => {
     return (data?.sleep_over_time || []).map((point) => ({
@@ -249,31 +258,22 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <ul className="goal-list">
-                  {data.goal_progress.map((g) => (
-                    <li key={g.goal_id}>
-                      <div style={{ width: '100%' }}>
+                  {data.goal_progress.map((g) => {
+                    const goal = goalsById[g.goal_id]
+                    const pct = goal?.completion_pct ?? 0
+                    return (
+                      <li key={g.goal_id}>
                         <div className="goal-meta">
                           <strong>{g.title}</strong>
-                          <span>
-                            {g.target_minutes
-                              ? `${g.actual_minutes} / ${g.target_minutes} min · ${Math.round(g.completion_pct)}%`
-                              : `${g.actual_minutes} min logged · due-date goal`}
-                          </span>
                         </div>
-                        {g.target_minutes > 0 && (
-                          <div className="progress-track">
-                            <div
-                              className="progress-fill"
-                              style={{
-                                width: `${Math.min(g.completion_pct, 100)}%`,
-                                background: categoryChartColor(g.category),
-                              }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </li>
-                  ))}
+                        <GoalProgressBar
+                          pct={pct}
+                          accentColor={categoryChartColor(g.category)}
+                          status={goal?.status || 'active'}
+                        />
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>

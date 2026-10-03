@@ -128,6 +128,13 @@ def ensure_sqlite_schema() -> None:
             )
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_goals_status ON goals (status)"))
 
+        goal_info = conn.execute(text("PRAGMA table_info(goals)")).fetchall()
+        goal_cols = {row[1] for row in goal_info}
+        if goal_cols and "completion_pct" not in goal_cols:
+            conn.execute(
+                text("ALTER TABLE goals ADD COLUMN completion_pct INTEGER NOT NULL DEFAULT 0")
+            )
+
         activity_cols = {
             row[1] for row in conn.execute(text("PRAGMA table_info(activities)")).fetchall()
         }
@@ -247,6 +254,26 @@ def ensure_activity_sleep_columns() -> None:
             conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_quality VARCHAR(20)"))
 
 
+def ensure_goal_completion_pct_column() -> None:
+    """Add user-set goal completion % on Postgres if missing."""
+    with engine.begin() as conn:
+        cols = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'goals'"
+                )
+            ).fetchall()
+        }
+        if not cols:
+            return
+        if "completion_pct" not in cols:
+            conn.execute(
+                text("ALTER TABLE goals ADD COLUMN completion_pct INTEGER NOT NULL DEFAULT 0")
+            )
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     settings = get_settings()
@@ -255,6 +282,7 @@ async def lifespan(_app: FastAPI):
         ensure_sqlite_schema()
     else:
         ensure_activity_sleep_columns()
+        ensure_goal_completion_pct_column()
     db = SessionLocal()
     try:
         ensure_legacy_custom_categories(db)

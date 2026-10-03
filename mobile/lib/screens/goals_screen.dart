@@ -10,6 +10,64 @@ import '../theme/theme_rebuild.dart';
 import '../widgets/brand.dart';
 import '../widgets/common.dart';
 
+class _GoalProgressSection extends StatelessWidget {
+  const _GoalProgressSection({
+    required this.completionPct,
+    required this.accent,
+    required this.status,
+    required this.trackColor,
+  });
+
+  final int completionPct;
+  final Color accent;
+  final String status;
+  final Color trackColor;
+
+  Color get _fillColor {
+    if (status == 'completed') return const Color(0xFF34D399);
+    if (status == 'failed') return const Color(0xFFFB7185);
+    return accent;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = completionPct.clamp(0, 100);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Task completion',
+              style: TextStyle(color: AppTheme.muted, fontSize: 12),
+            ),
+            Text(
+              '$pct%',
+              style: TextStyle(
+                color: accent,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: pct / 100,
+            minHeight: 8,
+            color: _fillColor,
+            backgroundColor: trackColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
 
@@ -21,19 +79,14 @@ class _GoalsData {
   const _GoalsData({
     required this.goals,
     required this.tasks,
-    required this.activities,
-    required this.weekProgress,
   });
 
   final List<GoalItem> goals;
   final List<TaskItem> tasks;
-  final List<ActivityItem> activities;
-  final Map<int, GoalProgress> weekProgress;
 }
 
 class _GoalsScreenState extends State<GoalsScreen> {
   late Future<_GoalsData> _future;
-
   @override
   void initState() {
     super.initState();
@@ -45,18 +98,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
     final results = await Future.wait([
       api.listGoals(),
       api.listTasks(),
-      api.listActivities(),
-      api.analytics(period: 'week'),
     ]);
-    final summary = results[3] as AnalyticsSummary;
-    final map = <int, GoalProgress>{
-      for (final g in summary.goalProgress) g.goalId: g,
-    };
     return _GoalsData(
       goals: results[0] as List<GoalItem>,
       tasks: results[1] as List<TaskItem>,
-      activities: results[2] as List<ActivityItem>,
-      weekProgress: map,
     );
   }
 
@@ -64,49 +109,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
     final next = _load();
     setState(() => _future = next);
     await next;
-  }
-
-  ({int actual, int target, double pct}) _progressFor(
-    GoalItem goal,
-    Map<int, GoalProgress> weekById,
-    List<ActivityItem> activities,
-  ) {
-    final linked = goal.taskIds.toSet();
-    if (goal.isDeadline) {
-      final start = goal.startDate ?? '1970-01-01';
-      final end = goal.endDate ?? '9999-12-31';
-      final actual = activities
-          .where((a) {
-            if (a.activityDate.compareTo(start) < 0 ||
-                a.activityDate.compareTo(end) > 0) {
-              return false;
-            }
-            if (linked.isNotEmpty) return linked.contains(a.taskId);
-            return a.category == goal.category;
-          })
-          .fold<int>(0, (sum, a) => sum + a.durationMinutes);
-      return (actual: actual, target: 0, pct: 0);
-    }
-    final fromAnalytics = weekById[goal.id];
-    if (fromAnalytics != null) {
-      return (
-        actual: fromAnalytics.actualMinutes,
-        target: fromAnalytics.targetMinutes,
-        pct: fromAnalytics.completionPct,
-      );
-    }
-    return (actual: 0, target: goal.targetMinutes ?? 0, pct: 0);
-  }
-
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'completed':
-        return 'Completed';
-      case 'failed':
-        return 'Failed';
-      default:
-        return 'Active';
-    }
   }
 
   Future<void> _complete(GoalItem goal) async {
@@ -122,10 +124,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
   }
 
   Future<void> _delete(GoalItem goal) async {
-    if (goal.status == 'failed') {
+    if (goal.status != 'active') {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed goals cannot be deleted.')),
+        const SnackBar(content: Text('Completed and failed goals cannot be deleted.')),
       );
       return;
     }
@@ -154,13 +156,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
     GoalItem? goal,
     required List<TaskItem> allTasks,
   }) async {
-    if (goal != null && (goal.status == 'completed' || goal.status == 'failed')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${_statusLabel(goal.status)} goals cannot be edited.')),
-      );
-      return;
-    }
-
     final api = context.read<AuthService>().api;
     final isEdit = goal != null;
     final dueDateLocked = isEdit && goal.endDate != null && goal.endDate!.isNotEmpty;
@@ -181,6 +176,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
     var startDate = goal?.startDate ?? '';
     var endDate = goal?.endDate ?? '';
     final selectedTaskIds = {...?goal?.taskIds};
+    var goalStatus = goal?.status ?? 'active';
+    var completionPct = goal?.completionPct ?? 0;
     String? formError;
 
     final ok = await showModalBottomSheet<bool>(
@@ -228,6 +225,32 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       }),
                       decoration: const InputDecoration(labelText: 'Category'),
                     ),
+                    if (isEdit) ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: goalStatus,
+                        items: const [
+                          DropdownMenuItem(value: 'active', child: Text('Active')),
+                          DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                          DropdownMenuItem(value: 'failed', child: Text('Failed')),
+                        ],
+                        onChanged: (v) => setLocal(() => goalStatus = v ?? goalStatus),
+                        decoration: const InputDecoration(labelText: 'Status'),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Task completion: $completionPct%',
+                        style: TextStyle(color: AppTheme.muted, fontSize: 13),
+                      ),
+                      Slider(
+                        value: completionPct.clamp(0, 100).toDouble(),
+                        min: 0,
+                        max: 100,
+                        divisions: 100,
+                        label: '$completionPct%',
+                        onChanged: (v) => setLocal(() => completionPct = v.round()),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     SegmentedButton<String>(
                       segments: const [
@@ -373,6 +396,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
       payload['target_minutes'] = null;
     }
     if (dueDateLocked) payload.remove('end_date');
+    if (isEdit) {
+      payload['status'] = goalStatus;
+      payload['completion_pct'] = completionPct.clamp(0, 100);
+    }
 
     try {
       if (isEdit) {
@@ -430,8 +457,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 final g = data.goals[i];
                 final cat = categoryOf(g.category);
                 final p = context.pulse;
-                final progress =
-                    _progressFor(g, data.weekProgress, data.activities);
                 final linkedTitles = g.tasks.isNotEmpty
                     ? g.tasks.map((t) => t.title).join(', ')
                     : g.taskIds
@@ -548,30 +573,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                   ),
                                 ],
                                 const SizedBox(height: 10),
-                                if (isActive && progress.target > 0) ...[
-                                  LinearProgressIndicator(
-                                    value: (progress.pct / 100).clamp(0, 1),
-                                    color: cat.fg,
-                                    backgroundColor: p.line,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${formatDuration(progress.actual)} / ${formatDuration(progress.target)}'
-                                    ' · ${progress.pct.round()}%',
-                                    style: TextStyle(
-                                      color: p.muted,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ] else if (isActive) ...[
-                                  Text(
-                                    'Logged ${formatDuration(progress.actual)}',
-                                    style: TextStyle(
-                                      color: p.muted,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
+                                _GoalProgressSection(
+                                  completionPct: g.completionPct,
+                                  accent: cat.fg,
+                                  status: g.status,
+                                  trackColor: p.line,
+                                ),
                                 if (isFailed) ...[
                                   const SizedBox(height: 4),
                                   Text(
@@ -583,20 +590,20 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                     ),
                                   ),
                                 ],
-                                if (isActive) ...[
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          style: rowButtonStyle,
-                                          onPressed: () => _openForm(
-                                            goal: g,
-                                            allTasks: data.tasks,
-                                          ),
-                                          child: const Text('Edit'),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        style: rowButtonStyle,
+                                        onPressed: () => _openForm(
+                                          goal: g,
+                                          allTasks: data.tasks,
                                         ),
+                                        child: const Text('Edit'),
                                       ),
+                                    ),
+                                    if (isActive) ...[
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: OutlinedButton(
@@ -606,11 +613,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                         ),
                                       ),
                                     ],
-                                  ),
-                                ],
-                                if (!isFailed) ...[
-                                  if (isActive) const SizedBox(height: 4),
-                                  if (!isActive) const SizedBox(height: 12),
+                                  ],
+                                ),
+                                if (isActive) ...[
+                                  const SizedBox(height: 4),
                                   SizedBox(
                                     width: double.infinity,
                                     child: TextButton(

@@ -132,6 +132,8 @@ class Goal(Base):
     # active | completed | failed
     status: Mapped[str] = mapped_column(String(20), default="active", index=True)
     is_active: Mapped[int] = mapped_column(Integer, default=1)  # 1 when status=active
+    # User-set task completion (0–100), shown on goal progress bar
+    completion_pct: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="goals")

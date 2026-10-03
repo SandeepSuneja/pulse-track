@@ -5,17 +5,19 @@ import { useAuth } from '../AuthContext'
 import { useCategories } from '../CategoryContext'
 import CategoryFormDialog from '../components/CategoryFormDialog'
 import ManageCategoriesDialog from '../components/ManageCategoriesDialog'
-import { formatDuration } from '../duration'
+import GoalProgressBar from '../components/GoalProgressBar'
 
 const emptyForm = () => ({
   title: '',
   category: 'work',
-  mode: 'hours', // hours | due
+  mode: 'hours',
   target_hours: 5,
   period: 'weekly',
   start_date: '',
   end_date: '',
   task_ids: [],
+  completion_pct: 0,
+  status: 'active',
 })
 
 function goalToForm(goal) {
@@ -29,6 +31,8 @@ function goalToForm(goal) {
     start_date: goal.start_date || '',
     end_date: goal.end_date || '',
     task_ids: (goal.task_ids || []).map(String),
+    completion_pct: goal.completion_pct ?? 0,
+    status: goal.status || (goal.is_active ? 'active' : 'completed'),
   }
 }
 
@@ -60,28 +64,8 @@ function statusLabel(status) {
   return 'Active'
 }
 
-function progressForGoal(goal, weekById, activities) {
-  const linkedIds = new Set(goal.task_ids || [])
-  if (isDeadlineGoal(goal)) {
-    const start = goal.start_date || '1970-01-01'
-    const end = goal.end_date || '9999-12-31'
-    const actual = activities
-      .filter((a) => {
-        const inWindow = a.activity_date >= start && a.activity_date <= end
-        if (!inWindow) return false
-        if (linkedIds.size > 0) return linkedIds.has(a.task_id)
-        return a.category === goal.category
-      })
-      .reduce((sum, a) => sum + (a.duration_minutes || 0), 0)
-    return { actual_minutes: actual, target_minutes: 0, completion_pct: 0 }
-  }
-  return (
-    weekById[goal.id] || {
-      actual_minutes: 0,
-      target_minutes: goal.target_minutes || 0,
-      completion_pct: 0,
-    }
-  )
+function clampPct(value) {
+  return Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
 }
 
 export default function Goals() {
@@ -89,8 +73,6 @@ export default function Goals() {
   const { categories, categoryColors, categoryLabel } = useCategories()
   const [goals, setGoals] = useState([])
   const [allTasks, setAllTasks] = useState([])
-  const [activities, setActivities] = useState([])
-  const [weekById, setWeekById] = useState({})
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [error, setError] = useState('')
@@ -103,23 +85,15 @@ export default function Goals() {
     () => goals.find((g) => g.id === editingId) || null,
     [goals, editingId],
   )
-  const dueDateLocked = Boolean(editingGoal?.end_date)
+  const dueDateLocked = Boolean(isEditing && editingGoal?.end_date)
 
   async function load() {
-    const [goalList, boardTasks, logs, summary] = await Promise.all([
+    const [goalList, boardTasks] = await Promise.all([
       api.listGoals(token),
       api.listTasks(token),
-      api.listActivities(token),
-      api.analytics(token, 'week'),
     ])
     setGoals(goalList)
     setAllTasks(boardTasks)
-    setActivities(logs)
-    const map = {}
-    for (const item of summary.goal_progress || []) {
-      map[item.goal_id] = item
-    }
-    setWeekById(map)
   }
 
   useEffect(() => {
@@ -137,7 +111,10 @@ export default function Goals() {
       ...prev,
       mode,
       ...(mode === 'hours'
-        ? { end_date: dueDateLocked ? prev.end_date : '', period: prev.period === 'deadline' ? 'weekly' : prev.period }
+        ? {
+            end_date: dueDateLocked ? prev.end_date : '',
+            period: prev.period === 'deadline' ? 'weekly' : prev.period,
+          }
         : { target_hours: prev.target_hours || 5 }),
     }))
   }
@@ -160,14 +137,6 @@ export default function Goals() {
   }
 
   function startEdit(goal) {
-    if (goal.status === 'failed') {
-      setError('Failed goals cannot be edited.')
-      return
-    }
-    if (goal.status === 'completed') {
-      setError('Completed goals cannot be edited.')
-      return
-    }
     setEditingId(goal.id)
     setForm(goalToForm(goal))
     setError('')
@@ -204,14 +173,15 @@ export default function Goals() {
     setBusy(true)
     setError('')
     try {
-      const payload = buildPayload()
       if (isEditing) {
-        // Never send end_date change when locked
+        const payload = buildPayload()
         if (dueDateLocked) delete payload.end_date
+        payload.completion_pct = clampPct(form.completion_pct)
+        payload.status = form.status
         await api.updateGoal(token, editingId, payload)
         resetEditor()
       } else {
-        await api.createGoal(token, payload)
+        await api.createGoal(token, buildPayload())
         setForm(emptyForm())
       }
       await load()
@@ -237,8 +207,9 @@ export default function Goals() {
   }
 
   async function remove(goal) {
-    if ((goal.status || (goal.is_active ? 'active' : 'completed')) === 'failed') {
-      setError('Failed goals cannot be deleted.')
+    const status = goal.status || (goal.is_active ? 'active' : 'completed')
+    if (status !== 'active') {
+      setError('Completed and failed goals cannot be deleted.')
       return
     }
     setBusy(true)
@@ -254,14 +225,16 @@ export default function Goals() {
     }
   }
 
+  const editorAccent = categoryColors(form.category)
+
   return (
     <div className="page">
       <header className="page-head">
         <div>
           <h1>Goals</h1>
           <p className="muted">
-            Link Board tasks to a goal, track progress from Activity logs, then mark the goal
-            complete. Missed due dates fail automatically.
+            Create goals or edit any goal (active, completed, or failed): details, status, linked
+            tasks, and task completion %.
           </p>
         </div>
       </header>
@@ -269,6 +242,7 @@ export default function Goals() {
       <div className="grid-2 goals-layout">
         <form className="panel stack goals-editor" onSubmit={onSubmit}>
           <h2>{isEditing ? 'Edit goal' : 'New goal'}</h2>
+
           <label>
             Title
             <input
@@ -310,6 +284,20 @@ export default function Goals() {
               <option value="__manage__">Manage categories…</option>
             </select>
           </label>
+
+          {isEditing && (
+            <label>
+              Status
+              <select
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value })}
+              >
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+              </select>
+            </label>
+          )}
 
           <div>
             <p className="muted" style={{ marginBottom: 8, fontWeight: 650 }}>
@@ -381,6 +369,36 @@ export default function Goals() {
             />
           </label>
 
+          {isEditing && (
+            <>
+              <p className="muted" style={{ marginBottom: 0, fontWeight: 650 }}>
+                Task completion
+              </p>
+              <GoalProgressBar
+                pct={form.completion_pct}
+                accentColor={editorAccent.fg}
+                status={form.status}
+                editable
+                disabled={busy}
+                onPctChange={(pct) => setForm({ ...form, completion_pct: clampPct(pct) })}
+              />
+              <label>
+                Completion (%)
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={form.completion_pct}
+                  disabled={busy}
+                  onChange={(e) =>
+                    setForm({ ...form, completion_pct: clampPct(e.target.value) })
+                  }
+                />
+              </label>
+            </>
+          )}
+
           <div>
             <p className="muted" style={{ marginBottom: 8, fontWeight: 650 }}>
               Associated Board tasks
@@ -431,10 +449,9 @@ export default function Goals() {
           ) : (
             <ul className="goal-manage-list goals-list-body">
               {goals.map((g) => {
-                const progress = progressForGoal(g, weekById, activities)
                 const status = g.status || (g.is_active ? 'active' : 'completed')
+                const completionPct = g.completion_pct ?? 0
                 const colors = categoryColors(g.category)
-                const pct = Math.min(Math.round(progress.completion_pct || 0), 100)
                 const isActive = status === 'active'
                 const isEditingThis = editingId === g.id
                 return (
@@ -477,27 +494,25 @@ export default function Goals() {
                           </div>
                         </div>
                         <div className="goal-manage-actions">
+                          <button
+                            type="button"
+                            className="ghost-btn ghost-btn-sm"
+                            onClick={() => startEdit(g)}
+                            disabled={busy}
+                          >
+                            Edit
+                          </button>
                           {isActive && (
-                            <>
-                              <button
-                                type="button"
-                                className="ghost-btn ghost-btn-sm"
-                                onClick={() => startEdit(g)}
-                                disabled={busy}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="ghost-btn ghost-btn-sm ghost-btn-accent"
-                                onClick={() => completeGoal(g)}
-                                disabled={busy}
-                              >
-                                Complete
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              className="ghost-btn ghost-btn-sm ghost-btn-accent"
+                              onClick={() => completeGoal(g)}
+                              disabled={busy}
+                            >
+                              Complete
+                            </button>
                           )}
-                          {status !== 'failed' && (
+                          {isActive && (
                             <button
                               type="button"
                               className="ghost-btn ghost-btn-sm ghost-btn-danger"
@@ -520,30 +535,11 @@ export default function Goals() {
                         </div>
                       )}
 
-                      {isActive && (
-                        <div className="goal-progress-block">
-                          <div className="goal-progress-stats">
-                            <span>
-                              {progress.target_minutes
-                                ? `${formatDuration(progress.actual_minutes)} / ${formatDuration(progress.target_minutes)}`
-                                : formatDuration(progress.actual_minutes)}
-                            </span>
-                            {progress.target_minutes > 0 ? (
-                              <span className="goal-progress-pct">{pct}%</span>
-                            ) : (
-                              <span className="muted">logged</span>
-                            )}
-                          </div>
-                          {progress.target_minutes > 0 && (
-                            <div className="progress-track">
-                              <div
-                                className="progress-fill"
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <GoalProgressBar
+                        pct={completionPct}
+                        accentColor={colors.fg}
+                        status={status}
+                      />
 
                       {status === 'failed' && (
                         <p className="goal-failed-note">
