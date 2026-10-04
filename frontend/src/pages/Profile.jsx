@@ -106,111 +106,101 @@ export default function Profile() {
         </div>
       </header>
 
-      <form className="panel stack narrow" onSubmit={onSubmit}>
-        <label>
-          Email
-          <input value={profile?.email || user?.email || ''} disabled />
-        </label>
-        <label>
-          Display name
-          <input
-            value={form.display_name}
-            onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-          />
-        </label>
-        <label>
-          Timezone
-          <input
-            value={form.timezone}
-            onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-            placeholder="e.g. Asia/Kolkata"
-          />
-        </label>
-        <label>
-          Bio
-          <textarea
-            rows={4}
-            value={form.bio}
-            onChange={(e) => setForm({ ...form, bio: e.target.value })}
-          />
-        </label>
-        {error && <p className="error">{error}</p>}
-        {message && <p className="success">{message}</p>}
-        <button type="submit" disabled={busy}>
-          {busy ? 'Saving…' : 'Save profile'}
-        </button>
-      </form>
-
-      <section className="panel stack narrow" style={{ marginTop: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.05rem' }}>Custom categories</h2>
-            <p className="muted" style={{ marginTop: 6 }}>
-              Pick a color with the color picker when you create a category. Edit name or color anytime.
-            </p>
+      <div className="grid-2 split-panels-layout profile-layout">
+        <form className="panel profile-form-panel" onSubmit={onSubmit}>
+          <div className="split-panel-scroll profile-form-scroll">
+            <h2>Profile details</h2>
+            <label>
+              Email
+              <input value={profile?.email || user?.email || ''} disabled />
+            </label>
+            <label>
+              Display name
+              <input
+                value={form.display_name}
+                onChange={(e) => setForm({ ...form, display_name: e.target.value })}
+              />
+            </label>
+            <label>
+              Timezone
+              <input
+                value={form.timezone}
+                onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+                placeholder="e.g. Asia/Kolkata"
+              />
+            </label>
+            <label>
+              Bio
+              <textarea
+                rows={4}
+                value={form.bio}
+                onChange={(e) => setForm({ ...form, bio: e.target.value })}
+              />
+            </label>
+            {error && <p className="error">{error}</p>}
+            {message && <p className="success">{message}</p>}
+            <button type="submit" disabled={busy}>
+              {busy ? 'Saving…' : 'Save profile'}
+            </button>
           </div>
-          <button type="button" onClick={openCreate}>
-            New category
-          </button>
-        </div>
+        </form>
 
-        {catError && <p className="error">{catError}</p>}
-        {catMessage && <p className="success">{catMessage}</p>}
+        <section className="panel profile-categories-panel">
+          <div className="profile-categories-head">
+            <div>
+              <h2>Custom categories</h2>
+              <p className="muted">
+                Pick a color with the color picker when you create a category. Edit name or color
+                anytime.
+              </p>
+            </div>
+            <button type="button" onClick={openCreate}>
+              New category
+            </button>
+          </div>
 
-        {customRows.length === 0 ? (
-          <p className="muted">No custom categories yet.</p>
-        ) : (
-          <ul className="stack" style={{ listStyle: 'none', margin: 0, padding: 0, gap: 10 }}>
-            {customRows.map((row) => (
-              <li
-                key={row.id}
-                style={{
-                  padding: '12px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  justifyContent: 'space-between',
-                  borderRadius: 12,
-                  border: '1px solid rgba(34,211,238,0.12)',
-                  background: 'rgba(13,22,36,0.6)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                  <span
-                    style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      background: row.color,
-                      flexShrink: 0,
-                      border: '1px solid rgba(255,255,255,0.15)',
-                    }}
-                  />
-                  <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.label}</strong>
-                </div>
-                <div className="chip-row">
-                  <button
-                    type="button"
-                    className="ghost-btn"
-                    disabled={catBusyId === row.id}
-                    onClick={() => openEdit(row)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-btn"
-                    disabled={catBusyId === row.id}
-                    onClick={() => removeCategory(row)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          <div className="split-panel-scroll profile-categories-scroll">
+            {catError && <p className="error">{catError}</p>}
+            {catMessage && <p className="success">{catMessage}</p>}
+
+            {customRows.length === 0 ? (
+              <p className="muted">No custom categories yet.</p>
+            ) : (
+              <ul className="profile-category-list">
+                {customRows.map((row) => (
+                  <li key={row.id} className="profile-category-item">
+                    <div className="profile-category-item-main">
+                      <span
+                        className="profile-category-swatch"
+                        style={{ background: row.color }}
+                      />
+                      <strong>{row.label}</strong>
+                    </div>
+                    <div className="chip-row">
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        disabled={catBusyId === row.id}
+                        onClick={() => openEdit(row)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        disabled={catBusyId === row.id}
+                        onClick={() => removeCategory(row)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      </div>
 
       <CategoryFormDialog
         open={formOpen}

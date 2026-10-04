@@ -107,7 +107,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     context.watchAppearance();
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
-      appBar: AppBar(title: const BrandedAppBarTitle('Analytics')),
+      appBar: AppBar(
+        title: const ScreenAppBarTitle('Analytics'),
+        automaticallyImplyLeading: false,
+      ),
       body: Column(
         children: [
           AnalyticsPeriodBar(

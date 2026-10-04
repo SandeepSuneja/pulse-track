@@ -239,7 +239,7 @@ export default function Goals() {
         </div>
       </header>
 
-      <div className="grid-2 goals-layout">
+      <div className="grid-2 split-panels-layout goals-layout">
         <form className="panel stack goals-editor" onSubmit={onSubmit}>
           <h2>{isEditing ? 'Edit goal' : 'New goal'}</h2>
 
@@ -447,7 +447,8 @@ export default function Goals() {
           {goals.length === 0 ? (
             <p className="muted">No goals yet. Create one and link Board tasks.</p>
           ) : (
-            <ul className="goal-manage-list goals-list-body">
+            <div className="goals-list-scroll split-panel-scroll">
+              <ul className="goal-manage-list">
               {goals.map((g) => {
                 const status = g.status || (g.is_active ? 'active' : 'completed')
                 const completionPct = g.completion_pct ?? 0
@@ -493,6 +494,7 @@ export default function Goals() {
                             ) : null}
                           </div>
                         </div>
+                        {isActive && (
                         <div className="goal-manage-actions">
                           <button
                             type="button"
@@ -502,27 +504,24 @@ export default function Goals() {
                           >
                             Edit
                           </button>
-                          {isActive && (
-                            <button
-                              type="button"
-                              className="ghost-btn ghost-btn-sm ghost-btn-accent"
-                              onClick={() => completeGoal(g)}
-                              disabled={busy}
-                            >
-                              Complete
-                            </button>
-                          )}
-                          {isActive && (
-                            <button
-                              type="button"
-                              className="ghost-btn ghost-btn-sm ghost-btn-danger"
-                              onClick={() => remove(g)}
-                              disabled={busy}
-                            >
-                              Delete
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            className="ghost-btn ghost-btn-sm ghost-btn-accent"
+                            onClick={() => completeGoal(g)}
+                            disabled={busy}
+                          >
+                            Complete
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost-btn ghost-btn-sm ghost-btn-danger"
+                            onClick={() => remove(g)}
+                            disabled={busy}
+                          >
+                            Delete
+                          </button>
                         </div>
+                        )}
                       </div>
 
                       {(g.tasks || []).length > 0 && (
@@ -550,7 +549,8 @@ export default function Goals() {
                   </li>
                 )
               })}
-            </ul>
+              </ul>
+            </div>
           )}
         </div>
       </div>

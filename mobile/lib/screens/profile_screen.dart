@@ -79,7 +79,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const BrandedAppBarTitle('Profile'),
+        title: const ScreenAppBarTitle('Profile'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             onPressed: () async {

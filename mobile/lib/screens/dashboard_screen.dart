@@ -90,7 +90,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
-      appBar: AppBar(title: const BrandedAppBarTitle('Dashboard')),
+      appBar: AppBar(
+        title: const ScreenAppBarTitle('Dashboard'),
+        automaticallyImplyLeading: false,
+      ),
       body: Column(
         children: [
           AnalyticsPeriodBar(
