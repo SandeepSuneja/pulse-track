@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/pulse_palette.dart';
 import '../theme/theme_rebuild.dart';
+import '../widgets/brand.dart';
 import '../widgets/common.dart';
 
 class BoardScreen extends StatefulWidget {
@@ -320,15 +321,7 @@ class _BoardScreenState extends State<BoardScreen> {
     return Scaffold(
       backgroundColor: AppTheme.bg,
       appBar: AppBar(
-        title: Text(
-          'Board',
-          style: TextStyle(
-            color: AppTheme.text,
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.6,
-          ),
-        ),
+        title: const ScreenAppBarTitle('Board'),
         automaticallyImplyLeading: false,
         actions: [
           Padding(

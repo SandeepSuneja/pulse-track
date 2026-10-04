@@ -198,18 +198,49 @@ h2,
   align-items: start;
 }
 
-/* Goals page: list column matches New/Edit goal panel height */
-.goals-layout {
+/* Goals & Profile: equal column height, viewport cap, scroll inside each panel */
+.split-panels-layout {
+  --split-panel-max-height: min(calc(100dvh - 11rem), 720px);
   align-items: stretch;
+}
+
+.split-panels-layout > .panel {
+  max-height: var(--split-panel-max-height);
+  min-height: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.split-panel-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.goals-layout .goals-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .goals-list-panel {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  /* Row height comes from the editor; this column fills it without growing the row */
-  height: 0;
-  min-height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -222,12 +253,90 @@ h2,
   flex: 0 0 auto;
 }
 
-.goals-list-body {
+.goals-list-scroll {
+  padding-right: 2px;
+}
+
+/* Profile page */
+.profile-form-panel {
+  overflow: hidden;
+}
+
+.profile-form-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.profile-form-scroll h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.profile-categories-panel {
+  gap: 14px;
+  overflow: hidden;
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
-  align-content: start;
-  padding-right: 2px;
+}
+
+.profile-categories-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-categories-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.profile-categories-head .muted {
+  margin: 6px 0 0;
+}
+
+.profile-category-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  grid-auto-rows: max-content;
+}
+
+.profile-category-item {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 211, 238, 0.12);
+  background: rgba(13, 22, 36, 0.6);
+}
+
+.profile-category-item-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.profile-category-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.profile-category-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-grid {
@@ -981,6 +1090,8 @@ button:not(.MuiButtonBase-root):disabled {
   padding: 0;
   display: grid;
   gap: 10px;
+  grid-auto-rows: max-content;
+  align-items: start;
 }
 
 .goal-manage-item {
@@ -988,6 +1099,8 @@ button:not(.MuiButtonBase-root):disabled {
   display: flex;
   gap: 0;
   padding: 0;
+  width: 100%;
+  align-self: start;
   border-radius: 12px;
   background: rgba(5, 10, 18, 0.55);
   border: 1px solid var(--line);
@@ -1016,6 +1129,8 @@ button:not(.MuiButtonBase-root):disabled {
   padding: 12px 12px 12px 14px;
   display: grid;
   gap: 10px;
+  grid-auto-rows: max-content;
+  align-content: start;
 }
 
 .goal-card-top {
@@ -1307,10 +1422,8 @@ button:not(.MuiButtonBase-root):disabled {
     grid-template-columns: 1fr;
   }
 
-  .goals-list-panel {
-    height: auto;
-    min-height: 0;
-    max-height: min(70vh, 640px);
+  .split-panels-layout {
+    --split-panel-max-height: min(calc(100dvh - 9rem), 520px);
   }
 
   .table-filters {

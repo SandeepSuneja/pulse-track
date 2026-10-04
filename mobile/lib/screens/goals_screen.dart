@@ -419,7 +419,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
     context.watchAppearance();
     return Scaffold(
       appBar: AppBar(
-        title: const BrandedAppBarTitle('Goals'),
+        title: const ScreenAppBarTitle('Goals'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
         ],
@@ -590,20 +591,20 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                     ),
                                   ),
                                 ],
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        style: rowButtonStyle,
-                                        onPressed: () => _openForm(
-                                          goal: g,
-                                          allTasks: data.tasks,
+                                if (isActive) ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          style: rowButtonStyle,
+                                          onPressed: () => _openForm(
+                                            goal: g,
+                                            allTasks: data.tasks,
+                                          ),
+                                          child: const Text('Edit'),
                                         ),
-                                        child: const Text('Edit'),
                                       ),
-                                    ),
-                                    if (isActive) ...[
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: OutlinedButton(
@@ -613,9 +614,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                                         ),
                                       ),
                                     ],
-                                  ],
-                                ),
-                                if (isActive) ...[
+                                  ),
                                   const SizedBox(height: 4),
                                   SizedBox(
                                     width: double.infinity,

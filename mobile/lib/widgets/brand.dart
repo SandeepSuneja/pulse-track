@@ -160,31 +160,25 @@ class GoogleMark extends StatelessWidget {
   }
 }
 
-/// App bar title with Pulse Track mark + page name.
-class BrandedAppBarTitle extends StatelessWidget {
-  const BrandedAppBarTitle(this.title, {super.key});
+/// Main tab screen app bar title (large wordmark-style, no logo).
+class ScreenAppBarTitle extends StatelessWidget {
+  const ScreenAppBarTitle(this.title, {super.key});
 
   final String title;
 
   @override
   Widget build(BuildContext context) {
     final p = context.pulse;
-    return Row(
-      children: [
-        const BrandLogo(height: 28),
-        const SizedBox(width: 10),
-        Flexible(
-          child: Text(
-            title,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: p.text,
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-            ),
-          ),
-        ),
-      ],
+    return Text(
+      title,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: p.text,
+        fontSize: 28,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.6,
+      ),
     );
   }
 }
+
