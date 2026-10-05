@@ -47,6 +47,12 @@ class TaskBase(BaseModel):
     due_date: Optional[date] = None
     estimate_minutes: int = Field(default=60, ge=1, le=24 * 60)
     goal_id: Optional[int] = None
+    health_activity_type: Optional[str] = Field(
+        default=None, pattern="^(weight_lifting|cardio)$"
+    )
+    health_cardio_type: Optional[str] = Field(
+        default=None, pattern="^(walking_running|cycling|swimming)$"
+    )
 
 
 class TaskCreate(TaskBase):
@@ -62,6 +68,12 @@ class TaskUpdate(BaseModel):
     due_date: Optional[date] = None
     estimate_minutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
     goal_id: Optional[int] = None
+    health_activity_type: Optional[str] = Field(
+        default=None, pattern="^(weight_lifting|cardio)$"
+    )
+    health_cardio_type: Optional[str] = Field(
+        default=None, pattern="^(walking_running|cycling|swimming)$"
+    )
 
 
 class TaskOut(TaskBase):
@@ -83,6 +95,7 @@ class ActivityBase(BaseModel):
     # Sleep category only — client may send; server recomputes duration + quality
     sleep_start_time: Optional[time] = None
     sleep_end_time: Optional[time] = None
+    distance_km: Optional[float] = Field(default=None, ge=0, le=500)
 
 
 class ActivityCreate(ActivityBase):
@@ -95,6 +108,7 @@ class ActivityUpdate(BaseModel):
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
     sleep_start_time: Optional[time] = None
     sleep_end_time: Optional[time] = None
+    distance_km: Optional[float] = Field(default=None, ge=0, le=500)
 
 
 class ActivityOut(BaseModel):
@@ -111,6 +125,7 @@ class ActivityOut(BaseModel):
     sleep_start_time: Optional[time] = None
     sleep_end_time: Optional[time] = None
     sleep_quality: Optional[str] = None
+    distance_km: Optional[float] = None
     created_at: datetime
 
 
@@ -222,6 +237,17 @@ class SleepTimeSeriesPoint(BaseModel):
     quality: str | None = None
 
 
+class HealthOverTimePoint(BaseModel):
+    """Health activity minutes (and walk/run distance) by day."""
+
+    date: date
+    weight_lifting_minutes: float = 0
+    walking_running_minutes: float = 0
+    walking_running_distance_km: float = 0
+    cycling_minutes: float = 0
+    swimming_minutes: float = 0
+
+
 class AnalyticsSummary(BaseModel):
     period: str
     start_date: date
@@ -233,6 +259,7 @@ class AnalyticsSummary(BaseModel):
     minutes_over_time: list[TimeSeriesPoint]
     category_minutes_over_time: list[CategoryTimeSeriesPoint] = []
     sleep_over_time: list[SleepTimeSeriesPoint] = []
+    health_over_time: list[HealthOverTimePoint] = []
     goal_progress: list[dict]
 
 

@@ -26,6 +26,13 @@ import { useCategories } from '../CategoryContext'
 import CategoryFormDialog from '../components/CategoryFormDialog'
 import ManageCategoriesDialog from '../components/ManageCategoriesDialog'
 import { formatDuration } from '../duration'
+import {
+  HEALTH_ACTIVITY_CARDIO,
+  HEALTH_ACTIVITY_OPTIONS,
+  HEALTH_ACTIVITY_WEIGHT_LIFTING,
+  HEALTH_CARDIO_OPTIONS,
+  HEALTH_CARDIO_WALKING_RUNNING,
+} from '../constants/health'
 
 const TASK_SECTIONS = [
   { id: 'activities', label: 'Activities' },
@@ -65,6 +72,8 @@ const emptyForm = () => ({
   start_date: '',
   due_date: '',
   goal_id: '',
+  health_activity_type: HEALTH_ACTIVITY_WEIGHT_LIFTING,
+  health_cardio_type: HEALTH_CARDIO_WALKING_RUNNING,
 })
 
 function taskToForm(task) {
@@ -76,6 +85,8 @@ function taskToForm(task) {
     start_date: task.start_date || '',
     due_date: task.due_date || '',
     goal_id: task.goal_id ? String(task.goal_id) : '',
+    health_activity_type: task.health_activity_type || HEALTH_ACTIVITY_WEIGHT_LIFTING,
+    health_cardio_type: task.health_cardio_type || HEALTH_CARDIO_WALKING_RUNNING,
   }
 }
 
@@ -253,6 +264,14 @@ export default function Board() {
       start_date: form.start_date || null,
       due_date: form.due_date || null,
       goal_id: form.goal_id ? Number(form.goal_id) : null,
+    }
+    if (form.category === 'health') {
+      payload.health_activity_type = form.health_activity_type
+      payload.health_cardio_type =
+        form.health_activity_type === HEALTH_ACTIVITY_CARDIO ? form.health_cardio_type : null
+    } else {
+      payload.health_activity_type = null
+      payload.health_cardio_type = null
     }
     try {
       if (isEditing) {
@@ -1046,6 +1065,51 @@ export default function Board() {
                       </MenuItem>
                     </TextField>
                   </Field>
+
+                  {form.category === 'health' && (
+                    <>
+                      <Field>
+                        <FieldLabel htmlFor="task-health-activity">Activity type</FieldLabel>
+                        <TextField
+                          id="task-health-activity"
+                          select
+                          value={form.health_activity_type}
+                          onChange={(e) =>
+                            setForm({ ...form, health_activity_type: e.target.value })
+                          }
+                          fullWidth
+                          sx={controlSx}
+                        >
+                          {HEALTH_ACTIVITY_OPTIONS.map((o) => (
+                            <MenuItem key={o.id} value={o.id}>
+                              {o.label}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Field>
+                      {form.health_activity_type === HEALTH_ACTIVITY_CARDIO && (
+                        <Field>
+                          <FieldLabel htmlFor="task-health-cardio">Cardio type</FieldLabel>
+                          <TextField
+                            id="task-health-cardio"
+                            select
+                            value={form.health_cardio_type}
+                            onChange={(e) =>
+                              setForm({ ...form, health_cardio_type: e.target.value })
+                            }
+                            fullWidth
+                            sx={controlSx}
+                          >
+                            {HEALTH_CARDIO_OPTIONS.map((o) => (
+                              <MenuItem key={o.id} value={o.id}>
+                                {o.label}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </Field>
+                      )}
+                    </>
+                  )}
 
                   <Field>
                     <FieldLabel htmlFor="task-goal">Goal</FieldLabel>

@@ -31,7 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     final now = DateTime.now();
     _range = AnalyticsRange(
-      mode: AnalyticsRangeMode.week,
+      mode: AnalyticsRangeMode.last30,
       selectedMonth: DateTime(now.year, now.month),
     );
     _future = _load();
@@ -120,6 +120,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final sleepBars = prepareSleepChart(
                   data.sleepOverTime,
                   period: chartPeriod,
+                );
+                final health = data.healthOverTime;
+                final weightLiftBars = prepareHealthMinutesChart(
+                  health,
+                  period: chartPeriod,
+                  pickMinutes: (p) => p.weightLiftingMinutes,
+                );
+                final walkRunCombined = prepareWalkRunCombinedChart(
+                  health,
+                  period: chartPeriod,
+                );
+                final cyclingBars = prepareHealthMinutesChart(
+                  health,
+                  period: chartPeriod,
+                  pickMinutes: (p) => p.cyclingMinutes,
+                );
+                final swimmingBars = prepareHealthMinutesChart(
+                  health,
+                  period: chartPeriod,
+                  pickMinutes: (p) => p.swimmingMinutes,
                 );
                 return RefreshIndicator(
                   onRefresh: _refresh,
@@ -218,6 +238,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ],
                               ),
                       ),
+                      if (weightLiftBars.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _Panel(
+                          title: 'Weight lifting · time',
+                          child: SizedBox(
+                            height: 220,
+                            child: _SimpleBarChart(
+                              points: weightLiftBars,
+                              colorFor: (_) => const Color(0xFF34D399),
+                              valueSuffix: '',
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (walkRunCombined.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _Panel(
+                          title: 'Walking / running',
+                          child: _WalkRunCombinedChart(points: walkRunCombined),
+                        ),
+                      ],
+                      if (cyclingBars.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _Panel(
+                          title: 'Cycling · time',
+                          child: SizedBox(
+                            height: 220,
+                            child: _SimpleBarChart(
+                              points: cyclingBars,
+                              colorFor: (_) => const Color(0xFFFBBF24),
+                              valueSuffix: '',
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (swimmingBars.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _Panel(
+                          title: 'Swimming · time',
+                          child: SizedBox(
+                            height: 220,
+                            child: _SimpleBarChart(
+                              points: swimmingBars,
+                              colorFor: (_) => const Color(0xFF60A5FA),
+                              valueSuffix: '',
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       _Panel(
                         title: 'Category mix',
@@ -293,11 +362,13 @@ class _SimpleBarChart extends StatelessWidget {
     required this.points,
     required this.colorFor,
     this.valueSuffix = '',
+    this.showBottomTitles = true,
   });
 
   final List<ChartBarPoint> points;
   final Color Function(ChartBarPoint point) colorFor;
   final String valueSuffix;
+  final bool showBottomTitles;
 
   @override
   Widget build(BuildContext context) {
@@ -400,10 +471,11 @@ class _SimpleBarChart extends StatelessWidget {
           ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 26,
+              showTitles: showBottomTitles,
+              reservedSize: showBottomTitles ? 26 : 0,
               interval: 1,
               getTitlesWidget: (value, meta) {
+                if (!showBottomTitles) return const SizedBox.shrink();
                 final i = value.toInt();
                 if (i < 0 || i >= points.length) return const SizedBox.shrink();
                 final show = i % interval == 0 || i == points.length - 1;
@@ -466,6 +538,218 @@ class _SimpleBarChart extends StatelessWidget {
                 ? 5.0
                 : 10.0;
     return nice * magnitude;
+  }
+}
+
+class _WalkRunCombinedChart extends StatelessWidget {
+  const _WalkRunCombinedChart({required this.points});
+
+  final List<WalkRunChartPoint> points;
+
+  static const _timeColor = Color(0xFF22D3EE);
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTime = points.any((p) => p.minutes > 0);
+    final hasDist = points.any((p) => p.distanceKm > 0);
+    final timeBars = [
+      for (final p in points)
+        ChartBarPoint(
+          label: p.label,
+          value: p.minutes,
+          tooltip: '${p.fullDate} · ${p.minutes.round()} min',
+        ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (hasTime) ...[
+          Text(
+            'Time',
+            style: TextStyle(
+              color: AppTheme.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: hasDist ? 120 : 200,
+            child: _SimpleBarChart(
+              points: timeBars,
+              colorFor: (_) => _timeColor,
+              showBottomTitles: !hasDist,
+            ),
+          ),
+        ],
+        if (hasTime && hasDist) const SizedBox(height: 14),
+        if (hasDist) ...[
+          Text(
+            'Distance',
+            style: TextStyle(
+              color: AppTheme.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: hasTime ? 120 : 200,
+            child: _WalkRunDistanceLineChart(points: points),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _WalkRunDistanceLineChart extends StatelessWidget {
+  const _WalkRunDistanceLineChart({required this.points});
+
+  final List<WalkRunChartPoint> points;
+
+  static const _distColor = Color(0xFF818CF8);
+
+  @override
+  Widget build(BuildContext context) {
+    final interval = labelIntervalFor(points.length);
+    final maxKm = points.fold<double>(
+      0,
+      (m, p) => p.distanceKm > m ? p.distanceKm : m,
+    );
+    final maxY = maxKm <= 0 ? 1.0 : _SimpleBarChart._niceMax(maxKm * 1.15);
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: (points.length - 1).clamp(0, 9999).toDouble(),
+        minY: 0,
+        maxY: maxY,
+        clipData: const FlClipData.all(),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: maxY / 4,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: AppTheme.chipBg,
+            strokeWidth: 1,
+          ),
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: Border(
+            bottom: BorderSide(color: AppTheme.line),
+            left: BorderSide(color: AppTheme.line),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          handleBuiltInTouches: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => AppTheme.tooltipBg,
+            getTooltipItems: (spots) {
+              return spots.map((spot) {
+                final i = spot.x.toInt();
+                if (i < 0 || i >= points.length) {
+                  return null;
+                }
+                final p = points[i];
+                return LineTooltipItem(
+                  '${p.fullDate}\n${p.distanceKm.toStringAsFixed(2)} km',
+                  TextStyle(
+                    color: AppTheme.tooltipFg,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                );
+              }).whereType<LineTooltipItem>().toList();
+            },
+          ),
+        ),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(),
+          rightTitles: const AxisTitles(),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 34,
+              interval: maxY / 4,
+              getTitlesWidget: (value, meta) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text(
+                    value >= 10
+                        ? '${value.round()}'
+                        : value.toStringAsFixed(1),
+                    style: TextStyle(
+                      color: _distColor.withValues(alpha: 0.9),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                );
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 26,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final i = value.toInt();
+                if (i < 0 || i >= points.length) {
+                  return const SizedBox.shrink();
+                }
+                final show = i % interval == 0 || i == points.length - 1;
+                if (!show) return const SizedBox.shrink();
+                return SideTitleWidget(
+                  meta: meta,
+                  space: 6,
+                  child: Text(
+                    points[i].label,
+                    style: TextStyle(
+                      color: AppTheme.muted,
+                      fontSize: points.length > 14 ? 9 : 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: [
+              for (var i = 0; i < points.length; i++)
+                FlSpot(i.toDouble(), points[i].distanceKm),
+            ],
+            isCurved: true,
+            preventCurveOverShooting: true,
+            curveSmoothness: 0.2,
+            color: _distColor,
+            barWidth: 2.5,
+            isStrokeCapRound: true,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, bar, index) {
+                return FlDotCirclePainter(
+                  radius: points[index].distanceKm > 0 ? 3.5 : 0,
+                  color: _distColor,
+                  strokeWidth: 0,
+                );
+              },
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              color: _distColor.withValues(alpha: 0.12),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

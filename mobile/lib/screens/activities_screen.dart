@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../constants/categories.dart';
+import '../constants/health.dart';
 import '../constants/sleep.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
@@ -141,6 +142,9 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     if (sleepEnd.isEmpty) sleepEnd = '06:30';
     final sleepStartCtrl = TextEditingController(text: sleepStart);
     final sleepEndCtrl = TextEditingController(text: sleepEnd);
+    final distanceCtrl = TextEditingController(
+      text: item?.distanceKm != null ? '${item!.distanceKm}' : '',
+    );
     String? formError;
 
     final ok = await showModalBottomSheet<bool>(
@@ -153,6 +157,11 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
             final formCategory =
                 isEdit ? editingCategory : (selectedTask?.category ?? '');
             final isSleep = formCategory == 'sleep';
+            final showDistance = formCategory == 'health' &&
+                ((selectedTask?.healthActivityType == healthActivityCardio &&
+                        selectedTask?.healthCardioType ==
+                            healthCardioWalkingRunning) ||
+                    item?.distanceKm != null);
             final sleepMins = isSleep
                 ? sleepDurationMinutes(sleepStartCtrl.text, sleepEndCtrl.text)
                 : null;
@@ -199,6 +208,19 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                         decoration: const InputDecoration(labelText: 'Task'),
                       ),
                     if (!isEdit) const SizedBox(height: 12),
+                    if (showDistance) ...[
+                      TextField(
+                        controller: distanceCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Distance (km)',
+                          hintText: 'Optional — walking or running',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     OutlinedButton.icon(
                       onPressed: () async {
                         final picked =
@@ -380,6 +402,10 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
 
     final formCategory = isEdit ? editingCategory : (selectedTask?.category ?? '');
     final isSleep = formCategory == 'sleep';
+    final logDistance = formCategory == 'health' &&
+        ((selectedTask?.healthActivityType == healthActivityCardio &&
+                selectedTask?.healthCardioType == healthCardioWalkingRunning) ||
+            item?.distanceKm != null);
     final body = <String, dynamic>{
       'activity_date': dateCtrl.text.trim(),
       'notes': notesCtrl.text.trim(),
@@ -394,6 +420,12 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
       final hours = int.tryParse(hoursCtrl.text) ?? 0;
       final minutes = int.tryParse(minutesCtrl.text) ?? 0;
       body['duration_minutes'] = hours * 60 + minutes;
+      if (logDistance) {
+        final raw = distanceCtrl.text.trim();
+        if (raw.isNotEmpty) {
+          body['distance_km'] = double.tryParse(raw);
+        }
+      }
     }
 
     try {

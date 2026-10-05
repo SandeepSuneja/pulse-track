@@ -98,6 +98,78 @@ String chartTitleSleep(String period, {String? monthLabel}) {
   }
 }
 
+List<ChartBarPoint> prepareHealthMinutesChart(
+  List<HealthPoint> points, {
+  required String period,
+  required double Function(HealthPoint) pickMinutes,
+}) {
+  if (points.isEmpty || !points.any((p) => pickMinutes(p) > 0)) {
+    return const [];
+  }
+  return [
+    for (final p in points)
+      ChartBarPoint(
+        label: _axisLabel(p.date, period: period),
+        value: pickMinutes(p),
+        tooltip:
+            '${_fullDate(p.date)} · ${_formatMinutes(pickMinutes(p).round())}',
+      ),
+  ];
+}
+
+List<ChartBarPoint> prepareHealthDistanceChart(
+  List<HealthPoint> points, {
+  required String period,
+  required double Function(HealthPoint) pickKm,
+}) {
+  if (points.isEmpty || !points.any((p) => pickKm(p) > 0)) {
+    return const [];
+  }
+  return [
+    for (final p in points)
+      ChartBarPoint(
+        label: _axisLabel(p.date, period: period),
+        value: pickKm(p),
+        tooltip: '${_fullDate(p.date)} · ${pickKm(p).toStringAsFixed(2)} km',
+      ),
+  ];
+}
+
+/// Walking / running: time + distance on the same day axis.
+class WalkRunChartPoint {
+  const WalkRunChartPoint({
+    required this.label,
+    required this.fullDate,
+    required this.minutes,
+    required this.distanceKm,
+  });
+
+  final String label;
+  final String fullDate;
+  final double minutes;
+  final double distanceKm;
+}
+
+List<WalkRunChartPoint> prepareWalkRunCombinedChart(
+  List<HealthPoint> points, {
+  required String period,
+}) {
+  if (points.isEmpty) return const [];
+  final hasData = points.any(
+    (p) => p.walkingRunningMinutes > 0 || p.walkingRunningDistanceKm > 0,
+  );
+  if (!hasData) return const [];
+  return [
+    for (final p in points)
+      WalkRunChartPoint(
+        label: _axisLabel(p.date, period: period),
+        fullDate: _fullDate(p.date),
+        minutes: p.walkingRunningMinutes,
+        distanceKm: p.walkingRunningDistanceKm,
+      ),
+  ];
+}
+
 /// Show every label when few bars; otherwise evenly spaced including ends.
 int labelIntervalFor(int count) {
   if (count <= 10) return 1;

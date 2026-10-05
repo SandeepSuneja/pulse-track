@@ -16,6 +16,7 @@ from app.schemas import (
     AnalyticsSummary,
     CategoryBreakdown,
     CategoryTimeSeriesPoint,
+    HealthOverTimePoint,
     SleepTimeSeriesPoint,
     TaskBreakdown,
     TimeSeriesPoint,
@@ -62,6 +63,15 @@ def analytics_summary(
         )
         .all()
     )
+    health_task_ids = {a.task_id for a in activities if a.task_id is not None}
+    health_tasks: dict[int, Task] = {}
+    if health_task_ids:
+        health_tasks = {
+            t.id: t
+            for t in db.query(Task)
+            .filter(Task.user_id == current_user.id, Task.id.in_(health_task_ids))
+            .all()
+        }
 
     total_minutes = sum(a.duration_minutes for a in activities)
     by_category: dict[str, int] = defaultdict(int)
@@ -122,6 +132,40 @@ def analytics_summary(
             date=d,
             **{cat: float(by_day_category[d].get(cat, 0)) for cat in active_categories},
         )
+        for d in _daterange(start_d, end_d)
+    ]
+
+    health_by_day: dict[date, dict[str, float]] = defaultdict(
+        lambda: {
+            "weight_lifting_minutes": 0.0,
+            "walking_running_minutes": 0.0,
+            "walking_running_distance_km": 0.0,
+            "cycling_minutes": 0.0,
+            "swimming_minutes": 0.0,
+        }
+    )
+    for a in activities:
+        task = health_tasks.get(a.task_id) if a.task_id else None
+        if not task or task.category != "health":
+            continue
+        activity_type = task.health_activity_type or "weight_lifting"
+        bucket = health_by_day[a.activity_date]
+        mins = float(a.duration_minutes)
+        if activity_type == "weight_lifting":
+            bucket["weight_lifting_minutes"] += mins
+        elif activity_type == "cardio":
+            cardio = task.health_cardio_type
+            if cardio == "walking_running":
+                bucket["walking_running_minutes"] += mins
+                if a.distance_km:
+                    bucket["walking_running_distance_km"] += float(a.distance_km)
+            elif cardio == "cycling":
+                bucket["cycling_minutes"] += mins
+            elif cardio == "swimming":
+                bucket["swimming_minutes"] += mins
+
+    health_over_time = [
+        HealthOverTimePoint(date=d, **health_by_day[d])
         for d in _daterange(start_d, end_d)
     ]
 
@@ -199,6 +243,7 @@ def analytics_summary(
         minutes_over_time=minutes_over_time,
         category_minutes_over_time=category_minutes_over_time,
         sleep_over_time=sleep_over_time,
+        health_over_time=health_over_time,
         goal_progress=goal_progress,
     )
 
