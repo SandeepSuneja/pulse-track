@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user
 from app.categories import assert_valid_category
 from app.database import get_db
+from app.health import normalize_health_task_fields
 from app.models import Activity, Goal, Task, User
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
 
@@ -25,11 +26,40 @@ def _task_out(task: Task, logged_minutes: int = 0, activity_count: int = 0) -> T
         due_date=task.due_date,
         estimate_minutes=task.estimate_minutes,
         goal_id=task.goal_id,
+        health_activity_type=task.health_activity_type,
+        health_cardio_type=task.health_cardio_type,
         created_at=task.created_at,
         logged_minutes=logged_minutes,
         activity_count=activity_count,
         goal_title=task.goal.title if task.goal is not None else None,
     )
+
+
+def _merge_health_fields(data: dict, task: Task | None) -> None:
+    category = data.get("category", task.category if task else None)
+    if category is None:
+        return
+    if "health_activity_type" in data:
+        activity_type = data["health_activity_type"]
+    elif task is not None:
+        activity_type = task.health_activity_type
+    else:
+        activity_type = None
+    if "health_cardio_type" in data:
+        cardio_type = data["health_cardio_type"]
+    elif task is not None:
+        cardio_type = task.health_cardio_type
+    else:
+        cardio_type = None
+    if category != "health":
+        data["health_activity_type"] = None
+        data["health_cardio_type"] = None
+        return
+    normalized_activity, normalized_cardio = normalize_health_task_fields(
+        category, activity_type, cardio_type
+    )
+    data["health_activity_type"] = normalized_activity
+    data["health_cardio_type"] = normalized_cardio
 
 
 def _activity_stats(db: Session, user_id: int, task_ids: list[int] | None = None) -> dict[int, tuple[int, int]]:
@@ -100,6 +130,7 @@ def create_task(
     data = payload.model_dump()
     assert_valid_category(db, current_user.id, data.get("category"))
     _validate_goal_id(db, current_user.id, data.get("goal_id"))
+    _merge_health_fields(data, None)
     task = Task(user_id=current_user.id, **data)
     db.add(task)
     db.commit()
@@ -150,6 +181,7 @@ def update_task(
         assert_valid_category(db, current_user.id, updates.get("category"))
     if "goal_id" in updates:
         _validate_goal_id(db, current_user.id, updates.get("goal_id"))
+    _merge_health_fields(updates, task)
     for key, value in updates.items():
         setattr(task, key, value)
     db.add(task)

@@ -5,6 +5,9 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Legend,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -35,7 +38,7 @@ function sleepHoursLabel(mins) {
 export default function Dashboard() {
   const { token } = useAuth()
   const { categoryChartColor, categoryLabel } = useCategories()
-  const [period, setPeriod] = useState('week')
+  const [period, setPeriod] = useState('month')
   const [data, setData] = useState(null)
   const [goals, setGoals] = useState([])
   const [error, setError] = useState('')
@@ -65,6 +68,102 @@ export default function Dashboard() {
   }, [data])
 
   const hasSleepLogs = sleepChartData.some((row) => row.minutes > 0)
+
+  const healthSeries = data?.health_over_time || []
+  const healthChart = (pickMinutes) =>
+    healthSeries.map((point) => ({
+      date: point.date,
+      minutes: pickMinutes(point),
+    }))
+
+  const weightLiftData = healthChart((p) => p.weight_lifting_minutes || 0)
+  const walkRunData = healthSeries.map((p) => ({
+    date: p.date,
+    minutes: p.walking_running_minutes || 0,
+    km: p.walking_running_distance_km || 0,
+  }))
+  const cyclingData = healthChart((p) => p.cycling_minutes || 0)
+  const swimmingData = healthChart((p) => p.swimming_minutes || 0)
+
+  const hasWeightLift = weightLiftData.some((r) => r.minutes > 0)
+  const hasWalkRun =
+    walkRunData.some((r) => r.minutes > 0) || walkRunData.some((r) => r.km > 0)
+  const hasCycling = cyclingData.some((r) => r.minutes > 0)
+  const hasSwimming = swimmingData.some((r) => r.minutes > 0)
+
+  function HealthMinutesChart({ rows, title }) {
+    if (!rows.some((r) => r.minutes > 0)) return null
+    return (
+      <div className="panel dashboard-panel">
+        <h2>{title}</h2>
+        <div className="chart-wrap">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={rows}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,211,238,0.12)" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8BA3C7' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#8BA3C7' }} />
+              <Tooltip formatter={(v) => [`${Math.round(v)} min`, 'Time']} />
+              <Bar dataKey="minutes" fill="#34D399" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    )
+  }
+
+  function WalkRunChart({ rows }) {
+    if (!rows.some((r) => r.minutes > 0 || r.km > 0)) return null
+    return (
+      <div className="panel dashboard-panel">
+        <h2>Walking / running</h2>
+        <div className="chart-wrap">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={rows}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(34,211,238,0.12)" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8BA3C7' }} />
+              <YAxis
+                yAxisId="left"
+                tick={{ fontSize: 11, fill: '#8BA3C7' }}
+                tickFormatter={(v) => `${Math.round(v)}m`}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 11, fill: '#A5B4FC' }}
+                tickFormatter={(v) => `${Number(v).toFixed(1)}km`}
+              />
+              <Tooltip
+                formatter={(value, name) => {
+                  if (name === 'Time (min)') return [`${Math.round(value)} min`, name]
+                  if (name === 'Distance (km)') return [`${Number(value).toFixed(2)} km`, name]
+                  return [value, name]
+                }}
+              />
+              <Legend />
+              <Bar
+                yAxisId="left"
+                dataKey="minutes"
+                name="Time (min)"
+                fill="#22D3EE"
+                radius={[8, 8, 0, 0]}
+                maxBarSize={28}
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="km"
+                name="Distance (km)"
+                stroke="#818CF8"
+                strokeWidth={2.5}
+                dot={{ r: 3, fill: '#818CF8', strokeWidth: 0 }}
+                activeDot={{ r: 5 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="page">
@@ -205,6 +304,17 @@ export default function Dashboard() {
               )}
             </div>
           </section>
+
+          {(hasWeightLift || hasWalkRun || hasCycling || hasSwimming) && (
+            <section className="dashboard-grid">
+              {hasWeightLift && (
+                <HealthMinutesChart rows={weightLiftData} title="Weight lifting · time" />
+              )}
+              {hasWalkRun && <WalkRunChart rows={walkRunData} />}
+              {hasCycling && <HealthMinutesChart rows={cyclingData} title="Cycling · time" />}
+              {hasSwimming && <HealthMinutesChart rows={swimmingData} title="Swimming · time" />}
+            </section>
+          )}
 
           <section className="dashboard-grid">
             <div className="panel dashboard-panel">

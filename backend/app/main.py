@@ -112,6 +112,19 @@ def ensure_sqlite_schema() -> None:
                 text("ALTER TABLE tasks ADD COLUMN goal_id INTEGER REFERENCES goals(id)")
             )
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_tasks_goal_id ON tasks (goal_id)"))
+        task_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(tasks)")).fetchall()}
+        if task_cols and "health_activity_type" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN health_activity_type VARCHAR(32)"))
+        if task_cols and "health_cardio_type" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN health_cardio_type VARCHAR(32)"))
+        task_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(tasks)")).fetchall()}
+        if task_cols and "health_activity_type" in task_cols:
+            conn.execute(
+                text(
+                    "UPDATE tasks SET health_activity_type = 'weight_lifting' "
+                    "WHERE category = 'health' AND health_activity_type IS NULL"
+                )
+            )
 
         # Refresh goal columns after possible rebuild
         goal_info = conn.execute(text("PRAGMA table_info(goals)")).fetchall()
@@ -149,6 +162,11 @@ def ensure_sqlite_schema() -> None:
             conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_end_time TIME"))
         if "sleep_quality" not in activity_cols:
             conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_quality VARCHAR(20)"))
+        activity_cols = {
+            row[1] for row in conn.execute(text("PRAGMA table_info(activities)")).fetchall()
+        }
+        if "distance_km" not in activity_cols:
+            conn.execute(text("ALTER TABLE activities ADD COLUMN distance_km FLOAT"))
 
         # Normalize categories on activities if column still present
         if "category" in activity_cols:
@@ -254,6 +272,54 @@ def ensure_activity_sleep_columns() -> None:
             conn.execute(text("ALTER TABLE activities ADD COLUMN sleep_quality VARCHAR(20)"))
 
 
+def ensure_health_columns() -> None:
+    """Health task types and activity distance on Postgres if missing."""
+    with engine.begin() as conn:
+        task_cols = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'tasks'"
+                )
+            ).fetchall()
+        }
+        if task_cols:
+            if "health_activity_type" not in task_cols:
+                conn.execute(text("ALTER TABLE tasks ADD COLUMN health_activity_type VARCHAR(32)"))
+            if "health_cardio_type" not in task_cols:
+                conn.execute(text("ALTER TABLE tasks ADD COLUMN health_cardio_type VARCHAR(32)"))
+        activity_cols = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'activities'"
+                )
+            ).fetchall()
+        }
+        if activity_cols and "distance_km" not in activity_cols:
+            conn.execute(text("ALTER TABLE activities ADD COLUMN distance_km DOUBLE PRECISION"))
+        if task_cols and "health_activity_type" in task_cols:
+            conn.execute(
+                text(
+                    "UPDATE tasks SET health_activity_type = 'weight_lifting' "
+                    "WHERE category = 'health' AND health_activity_type IS NULL"
+                )
+            )
+
+
+def backfill_health_task_types() -> None:
+    """Legacy Health tasks default to weight lifting so dashboard charts work."""
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE tasks SET health_activity_type = 'weight_lifting' "
+                "WHERE category = 'health' AND health_activity_type IS NULL"
+            )
+        )
+
+
 def ensure_goal_completion_pct_column() -> None:
     """Add user-set goal completion % on Postgres if missing."""
     with engine.begin() as conn:
@@ -282,7 +348,9 @@ async def lifespan(_app: FastAPI):
         ensure_sqlite_schema()
     else:
         ensure_activity_sleep_columns()
+        ensure_health_columns()
         ensure_goal_completion_pct_column()
+    backfill_health_task_types()
     db = SessionLocal()
     try:
         ensure_legacy_custom_categories(db)

@@ -43,6 +43,8 @@ class TaskItem {
     this.notes = '',
     this.activityCount = 0,
     this.loggedMinutes = 0,
+    this.healthActivityType,
+    this.healthCardioType,
   });
 
   final int id;
@@ -56,6 +58,8 @@ class TaskItem {
   final String notes;
   final int activityCount;
   final int loggedMinutes;
+  final String? healthActivityType;
+  final String? healthCardioType;
 
   String get ticketId => 'PT-$id';
 
@@ -72,6 +76,8 @@ class TaskItem {
       notes: json['notes'] as String? ?? '',
       activityCount: json['activity_count'] as int? ?? 0,
       loggedMinutes: json['logged_minutes'] as int? ?? 0,
+      healthActivityType: json['health_activity_type'] as String?,
+      healthCardioType: json['health_cardio_type'] as String?,
     );
   }
 }
@@ -88,6 +94,7 @@ class ActivityItem {
     this.sleepStartTime,
     this.sleepEndTime,
     this.sleepQuality,
+    this.distanceKm,
   });
 
   final int id;
@@ -100,6 +107,7 @@ class ActivityItem {
   final String? sleepStartTime;
   final String? sleepEndTime;
   final String? sleepQuality;
+  final double? distanceKm;
 
   factory ActivityItem.fromJson(Map<String, dynamic> json) {
     return ActivityItem(
@@ -113,6 +121,7 @@ class ActivityItem {
       sleepStartTime: json['sleep_start_time'] as String?,
       sleepEndTime: json['sleep_end_time'] as String?,
       sleepQuality: json['sleep_quality'] as String?,
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
     );
   }
 }
@@ -276,6 +285,38 @@ class CategoryMinutesPoint {
   }
 }
 
+class HealthPoint {
+  const HealthPoint({
+    required this.date,
+    this.weightLiftingMinutes = 0,
+    this.walkingRunningMinutes = 0,
+    this.walkingRunningDistanceKm = 0,
+    this.cyclingMinutes = 0,
+    this.swimmingMinutes = 0,
+  });
+
+  final String date;
+  final double weightLiftingMinutes;
+  final double walkingRunningMinutes;
+  final double walkingRunningDistanceKm;
+  final double cyclingMinutes;
+  final double swimmingMinutes;
+
+  factory HealthPoint.fromJson(Map<String, dynamic> json) {
+    return HealthPoint(
+      date: json['date']?.toString() ?? '',
+      weightLiftingMinutes:
+          (json['weight_lifting_minutes'] as num?)?.toDouble() ?? 0,
+      walkingRunningMinutes:
+          (json['walking_running_minutes'] as num?)?.toDouble() ?? 0,
+      walkingRunningDistanceKm:
+          (json['walking_running_distance_km'] as num?)?.toDouble() ?? 0,
+      cyclingMinutes: (json['cycling_minutes'] as num?)?.toDouble() ?? 0,
+      swimmingMinutes: (json['swimming_minutes'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
 class AnalyticsSummary {
   const AnalyticsSummary({
     required this.period,
@@ -288,6 +329,7 @@ class AnalyticsSummary {
     this.minutesOverTime = const [],
     this.categoryMinutesOverTime = const [],
     this.sleepOverTime = const [],
+    this.healthOverTime = const [],
     this.goalProgress = const [],
   });
 
@@ -301,6 +343,7 @@ class AnalyticsSummary {
   final List<TimePoint> minutesOverTime;
   final List<CategoryMinutesPoint> categoryMinutesOverTime;
   final List<SleepPoint> sleepOverTime;
+  final List<HealthPoint> healthOverTime;
   final List<GoalProgress> goalProgress;
 
   factory AnalyticsSummary.fromJson(Map<String, dynamic> json) {
@@ -324,6 +367,9 @@ class AnalyticsSummary {
           .toList(),
       sleepOverTime: (json['sleep_over_time'] as List? ?? [])
           .map((e) => SleepPoint.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+      healthOverTime: (json['health_over_time'] as List? ?? [])
+          .map((e) => HealthPoint.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
       goalProgress: (json['goal_progress'] as List? ?? [])
           .map((e) => GoalProgress.fromJson(Map<String, dynamic>.from(e as Map)))

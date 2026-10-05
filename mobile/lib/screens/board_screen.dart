@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../constants/categories.dart';
+import '../constants/health.dart';
 import '../models/models.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
@@ -86,6 +87,8 @@ class _BoardScreenState extends State<BoardScreen> {
     final titleCtrl = TextEditingController(text: task?.title ?? '');
     final notesCtrl = TextEditingController(text: task?.notes ?? '');
     var category = task?.category ?? 'work';
+    var healthActivityType = task?.healthActivityType ?? healthActivityWeightLifting;
+    var healthCardioType = task?.healthCardioType ?? healthCardioWalkingRunning;
     var status = task?.status ?? initialStatus;
     var startDate = task?.startDate ?? '';
     var dueDate = task?.dueDate ?? '';
@@ -177,6 +180,42 @@ class _BoardScreenState extends State<BoardScreen> {
                       }),
                       decoration: const InputDecoration(labelText: 'Category'),
                     ),
+                    if (category == 'health') ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: healthActivityType,
+                        items: healthActivityOptions
+                            .map(
+                              (o) => DropdownMenuItem(
+                                value: o.id,
+                                child: Text(o.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) => setLocal(() {
+                          healthActivityType = v ?? healthActivityType;
+                        }),
+                        decoration: const InputDecoration(labelText: 'Activity type'),
+                      ),
+                      if (healthActivityType == healthActivityCardio) ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: healthCardioType,
+                          items: healthCardioOptions
+                              .map(
+                                (o) => DropdownMenuItem(
+                                  value: o.id,
+                                  child: Text(o.label),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) => setLocal(() {
+                            healthCardioType = v ?? healthCardioType;
+                          }),
+                          decoration: const InputDecoration(labelText: 'Cardio type'),
+                        ),
+                      ],
+                    ],
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: status,
@@ -262,6 +301,11 @@ class _BoardScreenState extends State<BoardScreen> {
                     FilledButton(
                       onPressed: () {
                         if (titleCtrl.text.trim().isEmpty) return;
+                        if (category == 'health' &&
+                            healthActivityType == healthActivityCardio &&
+                            healthCardioType.isEmpty) {
+                          return;
+                        }
                         Navigator.pop(context, true);
                       },
                       child: Text(isEdit ? 'Save' : 'Create'),
@@ -295,6 +339,15 @@ class _BoardScreenState extends State<BoardScreen> {
       'due_date': dueDate.isEmpty ? null : dueDate,
       'goal_id': goalId,
     };
+    if (category == 'health') {
+      body['health_activity_type'] = healthActivityType;
+      body['health_cardio_type'] = healthActivityType == healthActivityCardio
+          ? healthCardioType
+          : null;
+    } else {
+      body['health_activity_type'] = null;
+      body['health_cardio_type'] = null;
+    }
     try {
       if (isEdit) {
         await api.updateTask(task.id, body);

@@ -8,6 +8,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import Activity, Task, User
 from app.schemas import ActivityCreate, ActivityOut, ActivityUpdate
+from app.health import apply_health_distance
 from app.sleep import classify_sleep_quality, sleep_duration_minutes
 
 router = APIRouter(prefix="/activities", tags=["activities"])
@@ -32,6 +33,7 @@ def _activity_out(activity: Activity) -> ActivityOut:
         sleep_start_time=activity.sleep_start_time,
         sleep_end_time=activity.sleep_end_time,
         sleep_quality=activity.sleep_quality,
+        distance_km=activity.distance_km,
         created_at=activity.created_at,
     )
 
@@ -124,6 +126,13 @@ def create_activity(
     if task.category != "sleep" and (duration is None or duration < 1):
         raise HTTPException(status_code=400, detail="Duration must be at least 1 minute.")
 
+    distance_km = apply_health_distance(
+        task_category=task.category,
+        health_activity_type=task.health_activity_type,
+        health_cardio_type=task.health_cardio_type,
+        distance_km=data.get("distance_km"),
+    )
+
     activity = Activity(
         user_id=current_user.id,
         task_id=task.id,
@@ -135,6 +144,7 @@ def create_activity(
         sleep_start_time=sleep_start,
         sleep_end_time=sleep_end,
         sleep_quality=quality,
+        distance_km=distance_km,
     )
     db.add(activity)
     db.commit()
@@ -196,6 +206,19 @@ def update_activity(
         data.pop("duration_minutes", None)
         data.pop("sleep_start_time", None)
         data.pop("sleep_end_time", None)
+
+    if "distance_km" in data:
+        task = activity.task
+        if task is not None:
+            activity.distance_km = apply_health_distance(
+                task_category=task.category,
+                health_activity_type=task.health_activity_type,
+                health_cardio_type=task.health_cardio_type,
+                distance_km=data.get("distance_km"),
+            )
+        else:
+            activity.distance_km = None
+        data.pop("distance_km", None)
 
     for key, value in data.items():
         setattr(activity, key, value)

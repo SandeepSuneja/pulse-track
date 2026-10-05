@@ -22,6 +22,10 @@ import {
   toTimeInputValue,
 } from '../sleep'
 import { combineDuration, formatDuration, splitDuration } from '../duration'
+import {
+  HEALTH_ACTIVITY_CARDIO,
+  HEALTH_CARDIO_WALKING_RUNNING,
+} from '../constants/health'
 
 const emptyForm = () => ({
   task_id: '',
@@ -31,6 +35,7 @@ const emptyForm = () => ({
   duration_minutes: 0,
   sleep_start_time: '23:00',
   sleep_end_time: '06:30',
+  distance_km: '',
 })
 
 const emptyFilters = () => ({
@@ -173,6 +178,7 @@ export default function Activities() {
       duration_minutes: parts.minutes,
       sleep_start_time: toTimeInputValue(item.sleep_start_time) || '23:00',
       sleep_end_time: toTimeInputValue(item.sleep_end_time) || '06:30',
+      distance_km: item.distance_km != null ? String(item.distance_km) : '',
     })
     setError('')
     setDialogOpen(true)
@@ -200,6 +206,12 @@ export default function Activities() {
   const sleepQuality = isSleepForm
     ? classifySleepQuality(form.sleep_start_time, form.sleep_end_time)
     : null
+  const showDistance =
+    !isSleepForm &&
+    formCategory === 'health' &&
+    ((selectedTask?.health_activity_type === HEALTH_ACTIVITY_CARDIO &&
+      selectedTask?.health_cardio_type === HEALTH_CARDIO_WALKING_RUNNING) ||
+      (isEditing && form.distance_km !== ''))
 
   async function onSubmit(e) {
     e.preventDefault()
@@ -245,6 +257,9 @@ export default function Activities() {
           body.duration_minutes = sleepMinutes
         } else {
           body.duration_minutes = combineDuration(form.duration_hours, form.duration_minutes)
+          if (showDistance && form.distance_km.trim()) {
+            body.distance_km = Number(form.distance_km)
+          }
         }
         await api.updateActivity(token, editingId, body)
       } else {
@@ -259,6 +274,9 @@ export default function Activities() {
           body.duration_minutes = sleepMinutes
         } else {
           body.duration_minutes = combineDuration(form.duration_hours, form.duration_minutes)
+          if (showDistance && form.distance_km.trim()) {
+            body.distance_km = Number(form.distance_km)
+          }
         }
         await api.createActivity(token, body)
       }
@@ -622,6 +640,19 @@ export default function Activities() {
                     />
                   </label>
                 </div>
+              )}
+              {showDistance && (
+                <label>
+                  Distance (km){' '}
+                  <span className="muted">optional — walking or running</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.distance_km}
+                    onChange={(e) => setForm({ ...form, distance_km: e.target.value })}
+                  />
+                </label>
               )}
               <label>
                 Notes{isSleepForm ? ' (optional)' : ''}

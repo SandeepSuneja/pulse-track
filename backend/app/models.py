@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy import (
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -80,6 +81,9 @@ class Task(Base):
     # null = indefinite (no due date)
     due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
     estimate_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    # Health category: weight_lifting | cardio (+ cardio subtype when cardio)
+    health_activity_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    health_cardio_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="tasks")
@@ -109,6 +113,8 @@ class Activity(Base):
     sleep_start_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
     sleep_end_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
     sleep_quality: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Walking / running health logs — distance in kilometres
+    distance_km: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="activities")
