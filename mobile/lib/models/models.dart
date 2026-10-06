@@ -38,8 +38,8 @@ class TaskItem {
     required this.category,
     this.startDate,
     this.dueDate,
-    this.goalId,
-    this.goalTitle,
+    this.goalIds = const [],
+    this.goalTitles = const [],
     this.notes = '',
     this.activityCount = 0,
     this.loggedMinutes = 0,
@@ -53,8 +53,8 @@ class TaskItem {
   final String category;
   final String? startDate;
   final String? dueDate;
-  final int? goalId;
-  final String? goalTitle;
+  final List<int> goalIds;
+  final List<String> goalTitles;
   final String notes;
   final int activityCount;
   final int loggedMinutes;
@@ -71,8 +71,14 @@ class TaskItem {
       category: json['category'] as String? ?? 'others',
       startDate: json['start_date'] as String?,
       dueDate: json['due_date'] as String?,
-      goalId: json['goal_id'] as int?,
-      goalTitle: json['goal_title'] as String?,
+      goalIds: (json['goal_ids'] as List<dynamic>?)
+              ?.map((e) => (e as num).toInt())
+              .toList() ??
+          const [],
+      goalTitles: (json['goal_titles'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       notes: json['notes'] as String? ?? '',
       activityCount: json['activity_count'] as int? ?? 0,
       loggedMinutes: json['logged_minutes'] as int? ?? 0,

@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user
 from app.categories import assert_valid_category
 from app.database import get_db
-from app.models import Goal, Task, User
+from app.goal_links import sync_goal_tasks
+from app.models import Goal, User
 from app.schemas import GoalCreate, GoalOut, GoalTaskBrief, GoalUpdate
 
 router = APIRouter(tags=["goals"])
@@ -40,27 +41,6 @@ def _expire_overdue_goals(db: Session, user_id: int) -> None:
         goal.is_active = 0
         db.add(goal)
     db.commit()
-
-
-def _sync_goal_tasks(db: Session, goal: Goal, task_ids: list[int], user_id: int) -> None:
-    db.query(Task).filter(Task.user_id == user_id, Task.goal_id == goal.id).update(
-        {Task.goal_id: None}, synchronize_session=False
-    )
-    if not task_ids:
-        return
-    unique_ids = list(dict.fromkeys(task_ids))
-    tasks = (
-        db.query(Task)
-        .filter(Task.user_id == user_id, Task.id.in_(unique_ids))
-        .all()
-    )
-    found = {t.id for t in tasks}
-    missing = [tid for tid in unique_ids if tid not in found]
-    if missing:
-        raise HTTPException(status_code=404, detail=f"Task(s) not found: {missing}")
-    for task in tasks:
-        task.goal_id = goal.id
-        db.add(task)
 
 
 def _goal_to_out(goal: Goal) -> GoalOut:
@@ -128,7 +108,7 @@ def create_goal(
     db.add(goal)
     db.flush()
     if task_ids:
-        _sync_goal_tasks(db, goal, task_ids, current_user.id)
+        sync_goal_tasks(db, goal, task_ids, current_user.id)
     db.commit()
     return _goal_to_out(_get_goal(db, goal.id, current_user.id))
 
@@ -199,7 +179,7 @@ def update_goal(
     db.add(goal)
 
     if task_ids is not None:
-        _sync_goal_tasks(db, goal, task_ids, current_user.id)
+        sync_goal_tasks(db, goal, task_ids, current_user.id)
 
     db.commit()
     return _goal_to_out(_get_goal(db, goal.id, current_user.id))
@@ -220,8 +200,5 @@ def delete_goal(
             status_code=400,
             detail="Completed and failed goals cannot be deleted",
         )
-    db.query(Task).filter(Task.goal_id == goal.id, Task.user_id == current_user.id).update(
-        {Task.goal_id: None}, synchronize_session=False
-    )
     db.delete(goal)
     db.commit()

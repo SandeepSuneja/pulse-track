@@ -46,7 +46,6 @@ class TaskBase(BaseModel):
     start_date: Optional[date] = None
     due_date: Optional[date] = None
     estimate_minutes: int = Field(default=60, ge=1, le=24 * 60)
-    goal_id: Optional[int] = None
     health_activity_type: Optional[str] = Field(
         default=None, pattern="^(weight_lifting|cardio)$"
     )
@@ -56,7 +55,7 @@ class TaskBase(BaseModel):
 
 
 class TaskCreate(TaskBase):
-    pass
+    goal_ids: list[int] = Field(default_factory=list)
 
 
 class TaskUpdate(BaseModel):
@@ -67,7 +66,7 @@ class TaskUpdate(BaseModel):
     start_date: Optional[date] = None
     due_date: Optional[date] = None
     estimate_minutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
-    goal_id: Optional[int] = None
+    goal_ids: Optional[list[int]] = None
     health_activity_type: Optional[str] = Field(
         default=None, pattern="^(weight_lifting|cardio)$"
     )
@@ -84,7 +83,8 @@ class TaskOut(TaskBase):
     created_at: datetime
     logged_minutes: int = 0
     activity_count: int = 0
-    goal_title: Optional[str] = None
+    goal_ids: list[int] = Field(default_factory=list)
+    goal_titles: list[str] = Field(default_factory=list)
 
 
 class ActivityBase(BaseModel):
@@ -152,6 +152,12 @@ class GoalCreate(GoalBase):
     task_ids: list[int] = Field(default_factory=list)
 
     @model_validator(mode="after")
+    def at_most_one_linked_task(self) -> GoalCreate:
+        if len(self.task_ids) > 1:
+            raise ValueError("A goal can only be linked to one task")
+        return self
+
+    @model_validator(mode="after")
     def require_hours_or_due_date(self) -> GoalCreate:
         has_hours = self.target_minutes is not None
         has_due = self.end_date is not None
@@ -181,6 +187,12 @@ class GoalUpdate(BaseModel):
     is_active: Optional[bool] = None
     completion_pct: Optional[int] = Field(default=None, ge=0, le=100)
     task_ids: Optional[list[int]] = None
+
+    @model_validator(mode="after")
+    def at_most_one_linked_task(self) -> GoalUpdate:
+        if self.task_ids is not None and len(self.task_ids) > 1:
+            raise ValueError("A goal can only be linked to one task")
+        return self
 
 
 class GoalOut(BaseModel):

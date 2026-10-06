@@ -6,7 +6,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user
 from app.database import get_db
@@ -187,17 +187,13 @@ def analytics_summary(
 
     goals = (
         db.query(Goal)
+        .options(joinedload(Goal.tasks))
         .filter(Goal.user_id == current_user.id, Goal.status == "active")
         .all()
     )
     goal_progress = []
     for goal in goals:
-        linked_task_ids = [
-            row[0]
-            for row in db.query(Task.id)
-            .filter(Task.user_id == current_user.id, Task.goal_id == goal.id)
-            .all()
-        ]
+        linked_task_ids = [t.id for t in goal.tasks] if goal.tasks else []
         q = db.query(func.coalesce(func.sum(Activity.duration_minutes), 0)).filter(
             Activity.user_id == current_user.id,
             Activity.activity_date >= start_d,

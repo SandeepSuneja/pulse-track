@@ -7,14 +7,21 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user
 from app.categories import assert_valid_category
 from app.database import get_db
+from app.goal_links import sync_task_goals
 from app.health import normalize_health_task_fields
-from app.models import Activity, Goal, Task, User
+from app.models import Activity, Task, User, goal_task_link
 from app.schemas import TaskCreate, TaskOut, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
+def _task_goals(task: Task) -> tuple[list[int], list[str]]:
+    goals = sorted(task.goals or [], key=lambda g: g.id)
+    return [g.id for g in goals], [g.title for g in goals]
+
+
 def _task_out(task: Task, logged_minutes: int = 0, activity_count: int = 0) -> TaskOut:
+    goal_ids, goal_titles = _task_goals(task)
     return TaskOut(
         id=task.id,
         user_id=task.user_id,
@@ -25,13 +32,13 @@ def _task_out(task: Task, logged_minutes: int = 0, activity_count: int = 0) -> T
         start_date=task.start_date,
         due_date=task.due_date,
         estimate_minutes=task.estimate_minutes,
-        goal_id=task.goal_id,
         health_activity_type=task.health_activity_type,
         health_cardio_type=task.health_cardio_type,
         created_at=task.created_at,
         logged_minutes=logged_minutes,
         activity_count=activity_count,
-        goal_title=task.goal.title if task.goal is not None else None,
+        goal_ids=goal_ids,
+        goal_titles=goal_titles,
     )
 
 
@@ -80,20 +87,6 @@ def _activity_stats(db: Session, user_id: int, task_ids: list[int] | None = None
     return {row[0]: (int(row[1] or 0), int(row[2] or 0)) for row in q.all()}
 
 
-def _validate_goal_id(db: Session, user_id: int, goal_id: int | None) -> None:
-    if goal_id is None:
-        return
-    goal = (
-        db.query(Goal)
-        .filter(Goal.id == goal_id, Goal.user_id == user_id)
-        .first()
-    )
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
-    if goal.status != "active":
-        raise HTTPException(status_code=400, detail="Can only link tasks to active goals")
-
-
 @router.get("", response_model=list[TaskOut])
 def list_tasks(
     status_filter: Optional[str] = Query(default=None, alias="status"),
@@ -104,7 +97,7 @@ def list_tasks(
 ) -> list[TaskOut]:
     q = (
         db.query(Task)
-        .options(joinedload(Task.goal))
+        .options(joinedload(Task.goals))
         .filter(Task.user_id == current_user.id)
     )
     if status_filter:
@@ -112,7 +105,7 @@ def list_tasks(
     if category:
         q = q.filter(Task.category == category)
     if goal_id is not None:
-        q = q.filter(Task.goal_id == goal_id)
+        q = q.join(goal_task_link).filter(goal_task_link.c.goal_id == goal_id)
     tasks = q.order_by(Task.created_at.desc(), Task.id.desc()).all()
     stats = _activity_stats(db, current_user.id, [t.id for t in tasks])
     return [
@@ -128,15 +121,17 @@ def create_task(
     current_user: User = Depends(get_current_user),
 ) -> TaskOut:
     data = payload.model_dump()
+    goal_ids = data.pop("goal_ids", []) or []
     assert_valid_category(db, current_user.id, data.get("category"))
-    _validate_goal_id(db, current_user.id, data.get("goal_id"))
     _merge_health_fields(data, None)
     task = Task(user_id=current_user.id, **data)
     db.add(task)
+    db.flush()
+    sync_task_goals(db, task, goal_ids, current_user.id)
     db.commit()
     task = (
         db.query(Task)
-        .options(joinedload(Task.goal))
+        .options(joinedload(Task.goals))
         .filter(Task.id == task.id)
         .first()
     )
@@ -151,7 +146,7 @@ def get_task(
 ) -> TaskOut:
     task = (
         db.query(Task)
-        .options(joinedload(Task.goal))
+        .options(joinedload(Task.goals))
         .filter(Task.id == task_id, Task.user_id == current_user.id)
         .first()
     )
@@ -170,21 +165,29 @@ def update_task(
 ) -> TaskOut:
     task = (
         db.query(Task)
-        .options(joinedload(Task.goal))
+        .options(joinedload(Task.goals))
         .filter(Task.id == task_id, Task.user_id == current_user.id)
         .first()
     )
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     updates = payload.model_dump(exclude_unset=True)
+    goal_ids = updates.pop("goal_ids", None)
     if "category" in updates:
         assert_valid_category(db, current_user.id, updates.get("category"))
-    if "goal_id" in updates:
-        _validate_goal_id(db, current_user.id, updates.get("goal_id"))
     _merge_health_fields(updates, task)
     for key, value in updates.items():
         setattr(task, key, value)
     db.add(task)
+    if goal_ids is not None:
+        sync_task_goals(db, task, goal_ids, current_user.id)
+    elif "category" in updates:
+        sync_task_goals(
+            db,
+            task,
+            [g.id for g in (task.goals or []) if g.category == task.category],
+            current_user.id,
+        )
     # Keep denormalized activity title/category aligned with the parent task
     if "title" in updates or "category" in updates:
         activity_sync = {}
@@ -200,7 +203,7 @@ def update_task(
     db.commit()
     task = (
         db.query(Task)
-        .options(joinedload(Task.goal))
+        .options(joinedload(Task.goals))
         .filter(Task.id == task.id)
         .first()
     )

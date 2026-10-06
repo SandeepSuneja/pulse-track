@@ -175,7 +175,8 @@ class _GoalsScreenState extends State<GoalsScreen> {
     );
     var startDate = goal?.startDate ?? '';
     var endDate = goal?.endDate ?? '';
-    final selectedTaskIds = {...?goal?.taskIds};
+    int? linkedTaskId =
+        (goal?.taskIds.isNotEmpty ?? false) ? goal!.taskIds.first : null;
     var goalStatus = goal?.status ?? 'active';
     var completionPct = goal?.completionPct ?? 0;
     String? formError;
@@ -219,9 +220,12 @@ class _GoalsScreenState extends State<GoalsScreen> {
                           .toList(),
                       onChanged: (v) => setLocal(() {
                         category = v ?? category;
-                        selectedTaskIds.removeWhere(
-                          (id) => !allTasks.any((t) => t.id == id && t.category == category),
-                        );
+                        if (linkedTaskId != null &&
+                            !allTasks.any(
+                              (t) => t.id == linkedTaskId && t.category == category,
+                            )) {
+                          linkedTaskId = null;
+                        }
                       }),
                       decoration: const InputDecoration(labelText: 'Category'),
                     ),
@@ -319,30 +323,34 @@ class _GoalsScreenState extends State<GoalsScreen> {
                       label: Text(startDate.isEmpty ? 'Start date (optional)' : 'Start $startDate'),
                     ),
                     const SizedBox(height: 12),
-                    const Text('Link tasks', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const Text('Link task', style: TextStyle(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
                     if (selectable.isEmpty)
                       Text(
                         'No tasks in this category.',
                         style: TextStyle(color: AppTheme.muted),
                       )
-                    else
+                    else ...[
+                      RadioListTile<int?>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('None'),
+                        value: null,
+                        groupValue: linkedTaskId,
+                        onChanged: (v) => setLocal(() => linkedTaskId = v),
+                      ),
                       ...selectable.map(
-                        (t) => CheckboxListTile(
+                        (t) => RadioListTile<int?>(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
-                          value: selectedTaskIds.contains(t.id),
-                          onChanged: (v) => setLocal(() {
-                            if (v == true) {
-                              selectedTaskIds.add(t.id);
-                            } else {
-                              selectedTaskIds.remove(t.id);
-                            }
-                          }),
+                          value: t.id,
+                          groupValue: linkedTaskId,
+                          onChanged: (v) => setLocal(() => linkedTaskId = v),
                           title: Text('${t.ticketId} · ${t.title}'),
                           subtitle: Text(taskStatuses[t.status] ?? t.status),
                         ),
                       ),
+                    ],
                     if (formError != null) ...[
                       const SizedBox(height: 8),
                       Text(formError!, style: const TextStyle(color: Colors.redAccent)),
@@ -383,7 +391,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
       'title': titleCtrl.text.trim(),
       'category': category,
       'start_date': startDate.isEmpty ? null : startDate,
-      'task_ids': selectedTaskIds.toList(),
+      'task_ids': linkedTaskId != null ? [linkedTaskId] : <int>[],
     };
     if (mode == 'hours') {
       final hours = double.tryParse(hoursCtrl.text) ?? 0;
