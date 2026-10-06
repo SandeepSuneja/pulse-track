@@ -119,15 +119,12 @@ export default function Goals() {
     }))
   }
 
-  function toggleTaskId(id) {
+  function selectTaskId(id) {
     const key = String(id)
-    setForm((prev) => {
-      const has = prev.task_ids.includes(key)
-      return {
-        ...prev,
-        task_ids: has ? prev.task_ids.filter((x) => x !== key) : [...prev.task_ids, key],
-      }
-    })
+    setForm((prev) => ({
+      ...prev,
+      task_ids: prev.task_ids.includes(key) ? [] : [key],
+    }))
   }
 
   function resetEditor() {
@@ -401,7 +398,7 @@ export default function Goals() {
 
           <div>
             <p className="muted" style={{ marginBottom: 8, fontWeight: 650 }}>
-              Associated Board tasks
+              Associated Board task
             </p>
             {selectableTasks.length === 0 ? (
               <p className="muted">
@@ -410,13 +407,25 @@ export default function Goals() {
               </p>
             ) : (
               <ul className="task-pick-list">
+                <li>
+                  <label className="check-row">
+                    <input
+                      type="radio"
+                      name="goal-linked-task"
+                      checked={form.task_ids.length === 0}
+                      onChange={() => setForm((prev) => ({ ...prev, task_ids: [] }))}
+                    />
+                    <span className="muted">No linked task</span>
+                  </label>
+                </li>
                 {selectableTasks.map((task) => (
                   <li key={task.id}>
                     <label className="check-row">
                       <input
-                        type="checkbox"
+                        type="radio"
+                        name="goal-linked-task"
                         checked={form.task_ids.includes(String(task.id))}
-                        onChange={() => toggleTaskId(task.id)}
+                        onChange={() => selectTaskId(task.id)}
                       />
                       <span>
                         PT-{task.id} · {task.title}{' '}

@@ -4,12 +4,14 @@ from datetime import date, datetime, time
 from typing import Optional
 
 from sqlalchemy import (
+    Column,
     Date,
     DateTime,
     Float,
     ForeignKey,
     Integer,
     String,
+    Table,
     Text,
     Time,
     UniqueConstraint,
@@ -18,6 +20,24 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+goal_task_link = Table(
+    "goal_task_link",
+    Base.metadata,
+    Column(
+        "goal_id",
+        Integer,
+        ForeignKey("goals.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "task_id",
+        Integer,
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+)
 
 
 class User(Base):
@@ -67,9 +87,6 @@ class Task(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    goal_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("goals.id", ondelete="SET NULL"), index=True, nullable=True
-    )
     title: Mapped[str] = mapped_column(String(200))
     category: Mapped[str] = mapped_column(String(80), index=True)
     # Built-in or custom slug (see custom_categories)
@@ -87,7 +104,10 @@ class Task(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="tasks")
-    goal: Mapped[Optional[Goal]] = relationship(back_populates="tasks")
+    goals: Mapped[list[Goal]] = relationship(
+        secondary=goal_task_link,
+        back_populates="tasks",
+    )
     activities: Mapped[list[Activity]] = relationship(
         back_populates="task", cascade="all, delete-orphan"
     )
@@ -143,4 +163,7 @@ class Goal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="goals")
-    tasks: Mapped[list[Task]] = relationship(back_populates="goal")
+    tasks: Mapped[list[Task]] = relationship(
+        secondary=goal_task_link,
+        back_populates="goals",
+    )

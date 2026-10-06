@@ -112,6 +112,72 @@ def ensure_sqlite_schema() -> None:
                 text("ALTER TABLE tasks ADD COLUMN goal_id INTEGER REFERENCES goals(id)")
             )
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_tasks_goal_id ON tasks (goal_id)"))
+        link_exists = conn.execute(
+            text(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='goal_task_link'"
+            )
+        ).fetchone()
+        goal_link_ddl = None
+        if link_exists:
+            goal_link_ddl = conn.execute(
+                text(
+                    "SELECT sql FROM sqlite_master "
+                    "WHERE type='table' AND name='goal_task_link'"
+                )
+            ).scalar()
+        needs_goal_link_rebuild = (
+            link_exists
+            and goal_link_ddl
+            and "PRIMARY KEY (goal_id, task_id)" in goal_link_ddl.replace("\n", " ")
+        )
+        if needs_goal_link_rebuild:
+            conn.execute(
+                text(
+                    "CREATE TABLE goal_task_link_new ("
+                    "goal_id INTEGER NOT NULL PRIMARY KEY, "
+                    "task_id INTEGER NOT NULL, "
+                    "FOREIGN KEY(goal_id) REFERENCES goals (id) ON DELETE CASCADE, "
+                    "FOREIGN KEY(task_id) REFERENCES tasks (id) ON DELETE CASCADE"
+                    ")"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT OR IGNORE INTO goal_task_link_new (goal_id, task_id) "
+                    "SELECT goal_id, MIN(task_id) FROM goal_task_link GROUP BY goal_id"
+                )
+            )
+            conn.execute(text("DROP TABLE goal_task_link"))
+            conn.execute(text("ALTER TABLE goal_task_link_new RENAME TO goal_task_link"))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_goal_task_link_task_id "
+                    "ON goal_task_link (task_id)"
+                )
+            )
+        elif not link_exists:
+            conn.execute(
+                text(
+                    "CREATE TABLE goal_task_link ("
+                    "goal_id INTEGER NOT NULL PRIMARY KEY, "
+                    "task_id INTEGER NOT NULL, "
+                    "FOREIGN KEY(goal_id) REFERENCES goals (id) ON DELETE CASCADE, "
+                    "FOREIGN KEY(task_id) REFERENCES tasks (id) ON DELETE CASCADE"
+                    ")"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_goal_task_link_task_id "
+                    "ON goal_task_link (task_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT OR IGNORE INTO goal_task_link (goal_id, task_id) "
+                    "SELECT goal_id, id FROM tasks WHERE goal_id IS NOT NULL"
+                )
+            )
         task_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(tasks)")).fetchall()}
         if task_cols and "health_activity_type" not in task_cols:
             conn.execute(text("ALTER TABLE tasks ADD COLUMN health_activity_type VARCHAR(32)"))

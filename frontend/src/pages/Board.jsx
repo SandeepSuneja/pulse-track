@@ -71,7 +71,7 @@ const emptyForm = () => ({
   notes: '',
   start_date: '',
   due_date: '',
-  goal_id: '',
+  goal_ids: [],
   health_activity_type: HEALTH_ACTIVITY_WEIGHT_LIFTING,
   health_cardio_type: HEALTH_CARDIO_WALKING_RUNNING,
 })
@@ -84,7 +84,7 @@ function taskToForm(task) {
     notes: task.notes || '',
     start_date: task.start_date || '',
     due_date: task.due_date || '',
-    goal_id: task.goal_id ? String(task.goal_id) : '',
+    goal_ids: (task.goal_ids || []).map(String),
     health_activity_type: task.health_activity_type || HEALTH_ACTIVITY_WEIGHT_LIFTING,
     health_cardio_type: task.health_cardio_type || HEALTH_CARDIO_WALKING_RUNNING,
   }
@@ -171,10 +171,14 @@ export default function Board() {
     () => goals.filter((g) => (g.status || 'active') === 'active'),
     [goals],
   )
-  const goalsForCategory = useMemo(
-    () => activeGoals.filter((g) => g.category === form.category),
-    [activeGoals, form.category],
-  )
+  const goalsForCategory = useMemo(() => {
+    const selected = new Set(form.goal_ids.map(String))
+    return goals.filter(
+      (g) =>
+        g.category === form.category &&
+        ((g.status || 'active') === 'active' || selected.has(String(g.id))),
+    )
+  }, [goals, form.category, form.goal_ids])
 
   async function load() {
     const [tasks, goalList] = await Promise.all([api.listTasks(token), api.listGoals(token)])
@@ -263,7 +267,7 @@ export default function Board() {
       status: form.status || 'todo',
       start_date: form.start_date || null,
       due_date: form.due_date || null,
-      goal_id: form.goal_id ? Number(form.goal_id) : null,
+      goal_ids: form.goal_ids.map(Number),
     }
     if (form.category === 'health') {
       payload.health_activity_type = form.health_activity_type
@@ -564,7 +568,7 @@ export default function Board() {
                                   <Box component="span">{dueLabel}</Box>
                                 </Stack>
                               )}
-                              {ticket.goal_title && (
+                              {(ticket.goal_titles || []).length > 0 && (
                                 <Typography
                                   sx={{
                                     mt: 0.55,
@@ -574,7 +578,8 @@ export default function Board() {
                                     lineHeight: 1.3,
                                   }}
                                 >
-                                  Goal · {ticket.goal_title}
+                                  Goal{(ticket.goal_titles || []).length > 1 ? 's' : ''} ·{' '}
+                                  {(ticket.goal_titles || []).join(', ')}
                                 </Typography>
                               )}
                             </Box>
@@ -984,12 +989,13 @@ export default function Board() {
                           setManageCategoriesOpen(true)
                           return
                         }
-                        const linked = activeGoals.find((g) => String(g.id) === String(form.goal_id))
-                        const stillValid = linked && linked.category === category
                         setForm({
                           ...form,
                           category,
-                          goal_id: stillValid ? form.goal_id : '',
+                          goal_ids: form.goal_ids.filter((id) => {
+                            const g = activeGoals.find((x) => String(x.id) === String(id))
+                            return g && g.category === category
+                          }),
                         })
                       }}
                       fullWidth
@@ -1112,31 +1118,52 @@ export default function Board() {
                   )}
 
                   <Field>
-                    <FieldLabel htmlFor="task-goal">Goal</FieldLabel>
-                    <TextField
-                      id="task-goal"
-                      select
-                      value={form.goal_id}
-                      onChange={(e) => setForm({ ...form, goal_id: e.target.value })}
-                      fullWidth
-                      sx={controlSx}
-                      SelectProps={{
-                        displayEmpty: true,
-                      }}
-                    >
-                      <MenuItem value="">
-                        <em>No goal</em>
-                      </MenuItem>
-                      {goalsForCategory.map((g) => (
-                        <MenuItem key={g.id} value={String(g.id)}>
-                          {g.title}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                    <FieldLabel>Goals</FieldLabel>
+                    {goalsForCategory.length === 0 ? (
+                      <Typography sx={{ fontSize: '0.75rem', color: '#8BA3C7' }}>
+                        No active goals in this category yet.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                        {goalsForCategory.map((g) => {
+                          const key = String(g.id)
+                          const checked = form.goal_ids.includes(key)
+                          return (
+                            <Box
+                              key={g.id}
+                              component="label"
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                cursor: 'pointer',
+                                fontSize: '0.875rem',
+                                color: '#C5D4E8',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setForm((prev) => {
+                                    const has = prev.goal_ids.includes(key)
+                                    return {
+                                      ...prev,
+                                      goal_ids: has
+                                        ? prev.goal_ids.filter((x) => x !== key)
+                                        : [...prev.goal_ids, key],
+                                    }
+                                  })
+                                }}
+                              />
+                              <span>{g.title}</span>
+                            </Box>
+                          )
+                        })}
+                      </Stack>
+                    )}
                     <Typography sx={{ mt: 0.6, fontSize: '0.75rem', color: '#8BA3C7' }}>
-                      {goalsForCategory.length === 0
-                        ? 'No active goals in this category yet.'
-                        : 'Link this task to an active goal.'}
+                      Link this task to one or more active goals.
                     </Typography>
                   </Field>
 
@@ -1257,7 +1284,7 @@ export default function Board() {
         mode="create"
         onClose={() => setCreateCategoryOpen(false)}
         onSaved={(slug) => {
-          setForm((prev) => ({ ...prev, category: slug, goal_id: '' }))
+          setForm((prev) => ({ ...prev, category: slug, goal_ids: [] }))
         }}
       />
       <ManageCategoriesDialog

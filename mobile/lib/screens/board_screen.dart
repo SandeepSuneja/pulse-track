@@ -92,7 +92,7 @@ class _BoardScreenState extends State<BoardScreen> {
     var status = task?.status ?? initialStatus;
     var startDate = task?.startDate ?? '';
     var dueDate = task?.dueDate ?? '';
-    int? goalId = task?.goalId;
+    var selectedGoalIds = Set<int>.from(task?.goalIds ?? const []);
     var activities = <ActivityItem>[];
     var activitiesLoading = isEdit;
     var activitiesFetchStarted = false;
@@ -117,32 +117,11 @@ class _BoardScreenState extends State<BoardScreen> {
                 setLocal(() => activitiesLoading = false);
               });
             }
-            final activeGoals = goals
-                .where((g) => (g.status == 'active') && g.category == category)
-                .toList();
-            final goalItems = <DropdownMenuItem<int?>>[
-              const DropdownMenuItem<int?>(value: null, child: Text('No goal')),
-              ...activeGoals.map(
-                (g) => DropdownMenuItem<int?>(
-                  value: g.id,
-                  child: Text(g.title, overflow: TextOverflow.ellipsis),
-                ),
-              ),
-            ];
-            if (goalId != null && !goalItems.any((i) => i.value == goalId)) {
-              final orphan = goals.where((g) => g.id == goalId).toList();
-              if (orphan.isNotEmpty) {
-                goalItems.add(
-                  DropdownMenuItem<int?>(
-                    value: orphan.first.id,
-                    child: Text(
-                      '${orphan.first.title} (other)',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                );
-              }
-            }
+            final pickerGoals = goals.where((g) {
+              if (g.category != category) return false;
+              if (g.status == 'active') return true;
+              return selectedGoalIds.contains(g.id);
+            }).toList();
             return Padding(
               padding: EdgeInsets.only(
                 left: 16,
@@ -173,10 +152,13 @@ class _BoardScreenState extends State<BoardScreen> {
                           .toList(),
                       onChanged: (v) => setLocal(() {
                         category = v ?? category;
-                        if (goalId != null &&
-                            !goals.any((g) => g.id == goalId && g.category == category)) {
-                          goalId = null;
-                        }
+                        selectedGoalIds = selectedGoalIds
+                            .where(
+                              (id) => goals.any(
+                                (g) => g.id == id && g.category == category,
+                              ),
+                            )
+                            .toSet();
                       }),
                       decoration: const InputDecoration(labelText: 'Category'),
                     ),
@@ -263,12 +245,43 @@ class _BoardScreenState extends State<BoardScreen> {
                         ),
                       ),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<int?>(
-                      initialValue: goalId,
-                      items: goalItems,
-                      onChanged: (v) => setLocal(() => goalId = v),
-                      decoration: const InputDecoration(labelText: 'Goal'),
+                    Text(
+                      'Goals',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
+                    if (pickerGoals.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'No active goals in this category.',
+                          style: TextStyle(color: AppTheme.muted, fontSize: 13),
+                        ),
+                      )
+                    else
+                      ...pickerGoals.map(
+                        (g) => CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(
+                            g.status == 'active' ? g.title : '${g.title} (inactive)',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          value: selectedGoalIds.contains(g.id),
+                          onChanged: g.status == 'active'
+                              ? (checked) => setLocal(() {
+                                    if (checked == true) {
+                                      selectedGoalIds.add(g.id);
+                                    } else {
+                                      selectedGoalIds.remove(g.id);
+                                    }
+                                  })
+                              : null,
+                        ),
+                      ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: notesCtrl,
@@ -337,7 +350,7 @@ class _BoardScreenState extends State<BoardScreen> {
       'notes': notesCtrl.text.trim(),
       'start_date': startDate.isEmpty ? null : startDate,
       'due_date': dueDate.isEmpty ? null : dueDate,
-      'goal_id': goalId,
+      'goal_ids': selectedGoalIds.toList(),
     };
     if (category == 'health') {
       body['health_activity_type'] = healthActivityType;
@@ -593,7 +606,8 @@ class _TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cat = categoryOf(task.category);
     final overdue = isOverdue(task.dueDate, task.status);
-    final hasGoal = task.goalTitle != null && task.goalTitle!.isNotEmpty;
+    final goalLabels = task.goalTitles;
+    final hasGoal = goalLabels.isNotEmpty;
     final activityLabel = task.activityCount == 0 && task.loggedMinutes == 0
         ? 'No activities yet'
         : '${task.activityCount} activit${task.activityCount == 1 ? 'y' : 'ies'}'
@@ -675,7 +689,7 @@ class _TaskCard extends StatelessWidget {
                         _MetaRow(
                           icon: Icons.circle,
                           iconSize: 8,
-                          text: task.goalTitle!,
+                          text: goalLabels.join(', '),
                           color: p.primary,
                           bold: true,
                         ),
