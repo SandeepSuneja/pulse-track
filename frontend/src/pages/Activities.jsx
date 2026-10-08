@@ -27,8 +27,23 @@ import {
   HEALTH_CARDIO_WALKING_RUNNING,
 } from '../constants/health'
 
+function defaultGoalIdForTask(task) {
+  if (!task?.goal_ids?.length) return ''
+  if (task.goal_ids.length === 1) return String(task.goal_ids[0])
+  return ''
+}
+
+function goalChoicesForTask(task) {
+  if (!task?.goal_ids?.length) return []
+  return task.goal_ids.map((id, index) => ({
+    id,
+    title: task.goal_titles?.[index] || `Goal ${id}`,
+  }))
+}
+
 const emptyForm = () => ({
   task_id: '',
+  goal_id: '',
   notes: '',
   activity_date: new Date().toISOString().slice(0, 10),
   duration_hours: 1,
@@ -64,6 +79,7 @@ export default function Activities() {
   const { categories, categoryLabel } = useCategories()
   const [items, setItems] = useState([])
   const [tasks, setTasks] = useState([])
+  const [taskCatalog, setTaskCatalog] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [filters, setFilters] = useState(emptyFilters)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -76,19 +92,23 @@ export default function Activities() {
   const isEditing = editingId != null
 
   async function load({ preserveForm = false } = {}) {
-    const [logs, boardTasks] = await Promise.all([
+    const [logs, boardTasks, allBoardTasks] = await Promise.all([
       api.listActivities(token),
       api.listTasks(token, { status: 'in_progress' }),
+      api.listTasks(token),
     ])
     setItems(logs)
     setTasks(boardTasks)
+    setTaskCatalog(allBoardTasks)
     if (preserveForm) return
     setForm((prev) => {
       const stillValid = boardTasks.some((t) => String(t.id) === String(prev.task_id))
       if (stillValid) return prev
+      const nextTask = boardTasks[0]
       return {
         ...prev,
-        task_id: boardTasks.length > 0 ? String(boardTasks[0].id) : '',
+        task_id: nextTask ? String(nextTask.id) : '',
+        goal_id: nextTask ? defaultGoalIdForTask(nextTask) : '',
       }
     })
   }
@@ -157,9 +177,12 @@ export default function Activities() {
     setEditingId(null)
     setEditingTitle('')
     setEditingCategory('')
+    const tid = defaultTaskId()
+    const task = tasks.find((t) => String(t.id) === tid)
     setForm({
       ...emptyForm(),
-      task_id: defaultTaskId(),
+      task_id: tid,
+      goal_id: defaultGoalIdForTask(task),
     })
     setError('')
     setDialogOpen(true)
@@ -172,6 +195,7 @@ export default function Activities() {
     const parts = splitDuration(item.duration_minutes)
     setForm({
       task_id: item.task_id ? String(item.task_id) : '',
+      goal_id: item.goal_id ? String(item.goal_id) : '',
       notes: item.notes || '',
       activity_date: item.activity_date,
       duration_hours: parts.hours,
@@ -191,13 +215,22 @@ export default function Activities() {
     setEditingTitle('')
     setEditingCategory('')
     setError('')
+    const tid = defaultTaskId()
+    const task = tasks.find((t) => String(t.id) === tid)
     setForm({
       ...emptyForm(),
-      task_id: defaultTaskId(),
+      task_id: tid,
+      goal_id: defaultGoalIdForTask(task),
     })
   }
 
   const selectedTask = tasks.find((t) => String(t.id) === String(form.task_id))
+  const taskForGoals =
+    taskCatalog.find((t) => String(t.id) === String(form.task_id)) || selectedTask
+  const taskGoalChoices = useMemo(
+    () => goalChoicesForTask(taskForGoals),
+    [taskForGoals],
+  )
   const formCategory = isEditing ? editingCategory : selectedTask?.category || ''
   const isSleepForm = formCategory === 'sleep'
   const sleepMinutes = isSleepForm
@@ -243,13 +276,22 @@ export default function Activities() {
         return
       }
     }
+    if (taskGoalChoices.length > 1 && !form.goal_id) {
+      setError('Select which goal this time counts toward.')
+      return
+    }
     setBusy(true)
     setError('')
+    const goalPayload =
+      taskGoalChoices.length > 0
+        ? { goal_id: form.goal_id ? Number(form.goal_id) : null }
+        : {}
     try {
       if (isEditing) {
         const body = {
           notes: form.notes,
           activity_date: form.activity_date,
+          ...goalPayload,
         }
         if (isSleepForm) {
           body.sleep_start_time = form.sleep_start_time
@@ -267,6 +309,7 @@ export default function Activities() {
           task_id: Number(form.task_id),
           notes: form.notes,
           activity_date: form.activity_date,
+          ...goalPayload,
         }
         if (isSleepForm) {
           body.sleep_start_time = form.sleep_start_time
@@ -407,6 +450,7 @@ export default function Activities() {
                   <th>Date</th>
                   <th>Task</th>
                   <th>Category</th>
+                  <th>Goal</th>
                   <th className="num">Duration</th>
                   <th>Notes</th>
                   <th className="actions">Actions</th>
@@ -430,6 +474,7 @@ export default function Activities() {
                         </div>
                       ) : null}
                     </td>
+                    <td>{item.goal_title || '—'}</td>
                     <td className="num nowrap">
                       {formatDuration(item.duration_minutes)}
                       {item.category === 'sleep' && item.sleep_start_time && item.sleep_end_time ? (
@@ -545,7 +590,14 @@ export default function Activities() {
                   Task
                   <select
                     value={form.task_id}
-                    onChange={(e) => setForm({ ...form, task_id: e.target.value })}
+                    onChange={(e) => {
+                      const task = tasks.find((t) => String(t.id) === e.target.value)
+                      setForm({
+                        ...form,
+                        task_id: e.target.value,
+                        goal_id: defaultGoalIdForTask(task),
+                      })
+                    }}
                     required
                   >
                     {tasks.map((task) => (
@@ -564,6 +616,33 @@ export default function Activities() {
                     ? ` · ${formatDuration(selectedTask.logged_minutes)} logged`
                     : ''}
                 </p>
+              )}
+              {taskGoalChoices.length > 0 && (
+                <label>
+                  Goal
+                  <select
+                    value={form.goal_id}
+                    onChange={(e) => setForm({ ...form, goal_id: e.target.value })}
+                    required={taskGoalChoices.length > 1}
+                  >
+                    {taskGoalChoices.length > 1 && (
+                      <option value="">Select a goal…</option>
+                    )}
+                    {taskGoalChoices.length === 1 && (
+                      <option value="">Not attributed to a goal</option>
+                    )}
+                    {taskGoalChoices.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.title}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="muted" style={{ display: 'block', marginTop: 6, fontSize: '0.85rem' }}>
+                    {taskGoalChoices.length > 1
+                      ? 'Required — this task is linked to multiple goals.'
+                      : 'Optional — attribute this log to the linked goal.'}
+                  </span>
+                </label>
               )}
               <label>
                 Date

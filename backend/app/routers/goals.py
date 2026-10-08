@@ -7,6 +7,7 @@ from app.auth import get_current_user
 from app.categories import assert_valid_category
 from app.database import get_db
 from app.goal_links import sync_goal_tasks
+from app.goal_time import logged_minutes_for_goals
 from app.models import Goal, User
 from app.schemas import GoalCreate, GoalOut, GoalTaskBrief, GoalUpdate
 
@@ -43,7 +44,7 @@ def _expire_overdue_goals(db: Session, user_id: int) -> None:
     db.commit()
 
 
-def _goal_to_out(goal: Goal) -> GoalOut:
+def _goal_to_out(goal: Goal, logged_minutes: int = 0) -> GoalOut:
     tasks = sorted(goal.tasks or [], key=lambda t: t.id)
     return GoalOut(
         id=goal.id,
@@ -63,6 +64,7 @@ def _goal_to_out(goal: Goal) -> GoalOut:
             GoalTaskBrief(id=t.id, title=t.title, status=t.status, category=t.category)
             for t in tasks
         ],
+        logged_minutes=logged_minutes,
     )
 
 
@@ -91,7 +93,8 @@ def list_goals(
         .order_by(Goal.is_active.desc(), Goal.start_date.desc())
         .all()
     )
-    return [_goal_to_out(g) for g in goals]
+    minutes_by_id = logged_minutes_for_goals(db, current_user.id, goals)
+    return [_goal_to_out(g, minutes_by_id.get(g.id, 0)) for g in goals]
 
 
 @router.post("/goals", response_model=GoalOut, status_code=status.HTTP_201_CREATED)
@@ -110,7 +113,9 @@ def create_goal(
     if task_ids:
         sync_goal_tasks(db, goal, task_ids, current_user.id)
     db.commit()
-    return _goal_to_out(_get_goal(db, goal.id, current_user.id))
+    goal = _get_goal(db, goal.id, current_user.id)
+    mins = logged_minutes_for_goals(db, current_user.id, [goal]).get(goal.id, 0)
+    return _goal_to_out(goal, mins)
 
 
 @router.patch("/goals/{goal_id}", response_model=GoalOut)
@@ -182,7 +187,9 @@ def update_goal(
         sync_goal_tasks(db, goal, task_ids, current_user.id)
 
     db.commit()
-    return _goal_to_out(_get_goal(db, goal.id, current_user.id))
+    goal = _get_goal(db, goal.id, current_user.id)
+    mins = logged_minutes_for_goals(db, current_user.id, [goal]).get(goal.id, 0)
+    return _goal_to_out(goal, mins)
 
 
 @router.delete("/goals/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)

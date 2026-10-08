@@ -475,6 +475,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
                         })
                         .join(', ');
                 final metaBits = <String>[
+                  '${formatDuration(g.loggedMinutes)} logged',
                   if (!g.isDeadline && g.targetMinutes != null)
                     '${formatDuration(g.targetMinutes!)} / ${g.period}',
                   if (g.startDate != null && g.startDate!.isNotEmpty)

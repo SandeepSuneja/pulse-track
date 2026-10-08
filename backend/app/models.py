@@ -123,6 +123,9 @@ class Activity(Base):
     task_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("tasks.id", ondelete="CASCADE"), index=True, nullable=True
     )
+    goal_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("goals.id", ondelete="SET NULL"), index=True, nullable=True
+    )
     # Denormalized for analytics / list display (copied from task on create)
     title: Mapped[str] = mapped_column(String(200), default="")
     category: Mapped[str] = mapped_column(String(80), index=True, default="others")
@@ -139,6 +142,7 @@ class Activity(Base):
 
     user: Mapped[User] = relationship(back_populates="activities")
     task: Mapped[Optional[Task]] = relationship(back_populates="activities")
+    goal: Mapped[Optional[Goal]] = relationship()
 
 
 class Goal(Base):

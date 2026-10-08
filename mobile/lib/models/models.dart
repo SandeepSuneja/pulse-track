@@ -101,10 +101,14 @@ class ActivityItem {
     this.sleepEndTime,
     this.sleepQuality,
     this.distanceKm,
+    this.goalId,
+    this.goalTitle,
   });
 
   final int id;
   final int? taskId;
+  final int? goalId;
+  final String? goalTitle;
   final String title;
   final String category;
   final String activityDate;
@@ -119,6 +123,8 @@ class ActivityItem {
     return ActivityItem(
       id: json['id'] as int,
       taskId: json['task_id'] as int?,
+      goalId: json['goal_id'] as int?,
+      goalTitle: json['goal_title'] as String?,
       title: json['title'] as String? ?? '',
       category: json['category'] as String? ?? 'others',
       activityDate: json['activity_date'] as String? ?? '',
@@ -169,6 +175,7 @@ class GoalItem {
     this.completionPct = 0,
     this.taskIds = const [],
     this.tasks = const [],
+    this.loggedMinutes = 0,
   });
 
   final int id;
@@ -183,6 +190,7 @@ class GoalItem {
   final int completionPct;
   final List<int> taskIds;
   final List<GoalTaskRef> tasks;
+  final int loggedMinutes;
 
   bool get isDeadline => period == 'deadline' || (targetMinutes == null && endDate != null);
 
@@ -200,6 +208,7 @@ class GoalItem {
       completionPct: completionPct ?? this.completionPct,
       taskIds: taskIds,
       tasks: tasks,
+      loggedMinutes: loggedMinutes,
     );
   }
 
@@ -229,6 +238,7 @@ class GoalItem {
               .map((e) => GoalTaskRef.fromJson(Map<String, dynamic>.from(e as Map)))
               .toList()
           : const <GoalTaskRef>[],
+      loggedMinutes: json['logged_minutes'] as int? ?? 0,
     );
   }
 }

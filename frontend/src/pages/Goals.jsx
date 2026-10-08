@@ -6,6 +6,7 @@ import { useCategories } from '../CategoryContext'
 import CategoryFormDialog from '../components/CategoryFormDialog'
 import ManageCategoriesDialog from '../components/ManageCategoriesDialog'
 import GoalProgressBar from '../components/GoalProgressBar'
+import { formatDuration } from '../duration'
 
 const emptyForm = () => ({
   title: '',
@@ -501,6 +502,9 @@ export default function Goals() {
                             {formatGoalMeta(g) ? (
                               <span className="goal-card-meta">{formatGoalMeta(g)}</span>
                             ) : null}
+                            <span className="goal-card-meta goal-time-logged">
+                              {formatDuration(g.logged_minutes ?? 0)} logged
+                            </span>
                           </div>
                         </div>
                         {isActive && (
