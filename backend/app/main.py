@@ -233,6 +233,19 @@ def ensure_sqlite_schema() -> None:
         }
         if "distance_km" not in activity_cols:
             conn.execute(text("ALTER TABLE activities ADD COLUMN distance_km FLOAT"))
+        activity_cols = {
+            row[1] for row in conn.execute(text("PRAGMA table_info(activities)")).fetchall()
+        }
+        if activity_cols and "goal_id" not in activity_cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE activities ADD COLUMN goal_id INTEGER "
+                    "REFERENCES goals(id) ON DELETE SET NULL"
+                )
+            )
+            conn.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_activities_goal_id ON activities (goal_id)")
+            )
 
         # Normalize categories on activities if column still present
         if "category" in activity_cols:

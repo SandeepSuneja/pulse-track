@@ -20,10 +20,31 @@ class ActivitiesScreen extends StatefulWidget {
 }
 
 class _ActivitiesData {
-  const _ActivitiesData({required this.items, required this.inProgressTasks});
+  const _ActivitiesData({
+    required this.items,
+    required this.inProgressTasks,
+    required this.taskCatalog,
+  });
 
   final List<ActivityItem> items;
   final List<TaskItem> inProgressTasks;
+  final List<TaskItem> taskCatalog;
+}
+
+int? _defaultGoalIdForTask(TaskItem? task) {
+  if (task == null || task.goalIds.isEmpty) return null;
+  if (task.goalIds.length == 1) return task.goalIds.first;
+  return null;
+}
+
+List<({int id, String title})> _goalChoicesForTask(TaskItem? task) {
+  if (task == null || task.goalIds.isEmpty) return [];
+  return List.generate(task.goalIds.length, (i) {
+    final title = i < task.goalTitles.length
+        ? task.goalTitles[i]
+        : 'Goal ${task.goalIds[i]}';
+    return (id: task.goalIds[i], title: title);
+  });
 }
 
 class _ActivitiesScreenState extends State<ActivitiesScreen> {
@@ -50,10 +71,12 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     final results = await Future.wait([
       api.listActivities(),
       api.listTasks(status: 'in_progress'),
+      api.listTasks(),
     ]);
     return _ActivitiesData(
       items: results[0] as List<ActivityItem>,
       inProgressTasks: results[1] as List<TaskItem>,
+      taskCatalog: results[2] as List<TaskItem>,
     );
   }
 
@@ -106,6 +129,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
   Future<void> _openForm({
     ActivityItem? item,
     required List<TaskItem> inProgressTasks,
+    required List<TaskItem> taskCatalog,
   }) async {
     final api = context.read<AuthService>().api;
     final isEdit = item != null;
@@ -145,6 +169,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     final distanceCtrl = TextEditingController(
       text: item?.distanceKm != null ? '${item!.distanceKm}' : '',
     );
+    int? selectedGoalId = item?.goalId ?? _defaultGoalIdForTask(selectedTask);
     String? formError;
 
     final ok = await showModalBottomSheet<bool>(
@@ -168,6 +193,17 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
             final sleepQ = isSleep
                 ? classifySleepQuality(sleepStartCtrl.text, sleepEndCtrl.text)
                 : null;
+            TaskItem? taskForGoals;
+            final goalTaskId = isEdit ? item.taskId : selectedTask?.id;
+            if (goalTaskId != null) {
+              for (final t in taskCatalog) {
+                if (t.id == goalTaskId) {
+                  taskForGoals = t;
+                  break;
+                }
+              }
+            }
+            final goalChoices = _goalChoicesForTask(taskForGoals);
 
             return Padding(
               padding: EdgeInsets.only(
@@ -204,10 +240,41 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                               ),
                             )
                             .toList(),
-                        onChanged: (v) => setLocal(() => selectedTask = v),
+                        onChanged: (v) => setLocal(() {
+                          selectedTask = v;
+                          selectedGoalId = _defaultGoalIdForTask(v);
+                        }),
                         decoration: const InputDecoration(labelText: 'Task'),
                       ),
                     if (!isEdit) const SizedBox(height: 12),
+                    if (goalChoices.isNotEmpty) ...[
+                      DropdownButtonFormField<int?>(
+                        value: selectedGoalId,
+                        items: [
+                          if (goalChoices.length > 1)
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('Select a goal…'),
+                            ),
+                          if (goalChoices.length == 1)
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('Not attributed to a goal'),
+                            ),
+                          ...goalChoices.map(
+                            (g) => DropdownMenuItem<int?>(
+                              value: g.id,
+                              child: Text(g.title, overflow: TextOverflow.ellipsis),
+                            ),
+                          ),
+                        ],
+                        onChanged: (v) => setLocal(() => selectedGoalId = v),
+                        decoration: InputDecoration(
+                          labelText: goalChoices.length > 1 ? 'Goal (required)' : 'Goal',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     if (showDistance) ...[
                       TextField(
                         controller: distanceCtrl,
@@ -332,6 +399,13 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                           );
                           return;
                         }
+                        if (goalChoices.length > 1 && selectedGoalId == null) {
+                          setLocal(
+                            () => formError =
+                                'Select which goal this time counts toward.',
+                          );
+                          return;
+                        }
                         if (isSleep) {
                           if (sleepStartCtrl.text.isEmpty || sleepEndCtrl.text.isEmpty) {
                             setLocal(
@@ -406,10 +480,24 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
         ((selectedTask?.healthActivityType == healthActivityCardio &&
                 selectedTask?.healthCardioType == healthCardioWalkingRunning) ||
             item?.distanceKm != null);
+    TaskItem? taskForGoals;
+    final goalTaskId = isEdit ? item!.taskId : selectedTask?.id;
+    if (goalTaskId != null) {
+      for (final t in taskCatalog) {
+        if (t.id == goalTaskId) {
+          taskForGoals = t;
+          break;
+        }
+      }
+    }
+    final goalChoices = _goalChoicesForTask(taskForGoals);
     final body = <String, dynamic>{
       'activity_date': dateCtrl.text.trim(),
       'notes': notesCtrl.text.trim(),
     };
+    if (goalChoices.isNotEmpty) {
+      body['goal_id'] = selectedGoalId;
+    }
     if (isSleep) {
       final sleepMins =
           sleepDurationMinutes(sleepStartCtrl.text, sleepEndCtrl.text);
@@ -463,7 +551,10 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                   try {
                     final data = await _future;
                     if (!mounted) return;
-                    await _openForm(inProgressTasks: data.inProgressTasks);
+                    await _openForm(
+                      inProgressTasks: data.inProgressTasks,
+                      taskCatalog: data.taskCatalog,
+                    );
                   } catch (_) {
                     messenger.showSnackBar(
                       const SnackBar(
@@ -669,6 +760,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
                         onTap: () => _openForm(
                           item: item,
                           inProgressTasks: data.inProgressTasks,
+                          taskCatalog: data.taskCatalog,
                         ),
                       ),
                     ),
@@ -758,6 +850,19 @@ class _ActivityCard extends StatelessWidget {
                           color: p.text,
                         ),
                       ),
+                      if (item.goalTitle != null && item.goalTitle!.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          item.goalTitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: p.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,

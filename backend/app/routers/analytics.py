@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.goal_time import sum_goal_minutes
 from app.models import Activity, Goal, Task, User
 from app.routers.goals import _expire_overdue_goals
 from app.schemas import (
@@ -193,17 +194,13 @@ def analytics_summary(
     )
     goal_progress = []
     for goal in goals:
-        linked_task_ids = [t.id for t in goal.tasks] if goal.tasks else []
-        q = db.query(func.coalesce(func.sum(Activity.duration_minutes), 0)).filter(
-            Activity.user_id == current_user.id,
-            Activity.activity_date >= start_d,
-            Activity.activity_date <= end_d,
+        actual = sum_goal_minutes(
+            db,
+            current_user.id,
+            goal,
+            start_date=start_d,
+            end_date=end_d,
         )
-        if linked_task_ids:
-            q = q.filter(Activity.task_id.in_(linked_task_ids))
-        else:
-            q = q.filter(Activity.category == goal.category)
-        actual = q.scalar()
         target = goal.target_minutes or 0
         days = max((end_d - start_d).days + 1, 1)
         if not target or goal.period == "deadline":

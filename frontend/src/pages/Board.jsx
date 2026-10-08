@@ -5,9 +5,11 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Stack,
@@ -1124,43 +1126,68 @@ export default function Board() {
                         No active goals in this category yet.
                       </Typography>
                     ) : (
-                      <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                      <Box
+                        sx={{
+                          mt: 0.75,
+                          borderRadius: '10px',
+                          border: '1px solid rgba(34, 211, 238, 0.12)',
+                          bgcolor: 'rgba(5, 10, 18, 0.55)',
+                          maxHeight: 200,
+                          overflowY: 'auto',
+                          py: 0.25,
+                        }}
+                      >
                         {goalsForCategory.map((g) => {
                           const key = String(g.id)
                           const checked = form.goal_ids.includes(key)
                           return (
-                            <Box
+                            <FormControlLabel
                               key={g.id}
-                              component="label"
                               sx={{
                                 display: 'flex',
-                                alignItems: 'center',
-                                gap: 1,
-                                cursor: 'pointer',
-                                fontSize: '0.875rem',
-                                color: '#C5D4E8',
+                                alignItems: 'flex-start',
+                                mx: 0,
+                                px: 1.25,
+                                py: 0.35,
+                                width: '100%',
+                                '& .MuiCheckbox-root': {
+                                  p: 0.75,
+                                  mt: 0.1,
+                                },
+                                '& .MuiFormControlLabel-label': {
+                                  fontSize: '0.875rem',
+                                  fontWeight: 500,
+                                  color: '#C5D4E8',
+                                  lineHeight: 1.4,
+                                  pt: 0.65,
+                                },
                               }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => {
-                                  setForm((prev) => {
-                                    const has = prev.goal_ids.includes(key)
-                                    return {
-                                      ...prev,
-                                      goal_ids: has
-                                        ? prev.goal_ids.filter((x) => x !== key)
-                                        : [...prev.goal_ids, key],
-                                    }
-                                  })
-                                }}
-                              />
-                              <span>{g.title}</span>
-                            </Box>
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setForm((prev) => {
+                                      const has = prev.goal_ids.includes(key)
+                                      return {
+                                        ...prev,
+                                        goal_ids: has
+                                          ? prev.goal_ids.filter((x) => x !== key)
+                                          : [...prev.goal_ids, key],
+                                      }
+                                    })
+                                  }}
+                                  sx={{
+                                    color: '#5B7394',
+                                    '&.Mui-checked': { color: '#22D3EE' },
+                                  }}
+                                />
+                              }
+                              label={g.title}
+                            />
                           )
                         })}
-                      </Stack>
+                      </Box>
                     )}
                     <Typography sx={{ mt: 0.6, fontSize: '0.75rem', color: '#8BA3C7' }}>
                       Link this task to one or more active goals.

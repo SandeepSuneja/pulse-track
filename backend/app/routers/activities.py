@@ -2,11 +2,13 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.activity_goals import validate_activity_goal_id
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import Activity, Task, User
+from app.models import Activity, Task, User, goal_task_link
 from app.schemas import ActivityCreate, ActivityOut, ActivityUpdate
 from app.health import apply_health_distance
 from app.sleep import classify_sleep_quality, sleep_duration_minutes
@@ -25,6 +27,8 @@ def _activity_out(activity: Activity) -> ActivityOut:
         id=activity.id,
         user_id=activity.user_id,
         task_id=activity.task_id,
+        goal_id=activity.goal_id,
+        goal_title=activity.goal.title if activity.goal is not None else None,
         title=title,
         category=category,
         notes=activity.notes,
@@ -80,7 +84,7 @@ def list_activities(
 ) -> list[ActivityOut]:
     q = (
         db.query(Activity)
-        .options(joinedload(Activity.task))
+        .options(joinedload(Activity.task), joinedload(Activity.goal))
         .filter(Activity.user_id == current_user.id)
     )
     if start_date:
@@ -117,6 +121,19 @@ def create_activity(
         )
 
     data = payload.model_dump()
+    goal_id = data.get("goal_id")
+    linked_goal_ids = [
+        row[0]
+        for row in db.execute(
+            select(goal_task_link.c.goal_id).where(goal_task_link.c.task_id == task.id)
+        ).all()
+    ]
+    if len(linked_goal_ids) > 1 and goal_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="This task is linked to multiple goals. Select which goal this log counts toward.",
+        )
+    validate_activity_goal_id(db, current_user.id, task, goal_id)
     duration, sleep_start, sleep_end, quality = _apply_sleep_fields(
         category=task.category,
         sleep_start_time=data.get("sleep_start_time"),
@@ -136,6 +153,7 @@ def create_activity(
     activity = Activity(
         user_id=current_user.id,
         task_id=task.id,
+        goal_id=goal_id,
         title=task.title,
         category=task.category,
         notes=data["notes"],
@@ -148,8 +166,12 @@ def create_activity(
     )
     db.add(activity)
     db.commit()
-    db.refresh(activity)
-    activity.task = task
+    activity = (
+        db.query(Activity)
+        .options(joinedload(Activity.task), joinedload(Activity.goal))
+        .filter(Activity.id == activity.id)
+        .first()
+    )
     return _activity_out(activity)
 
 
@@ -161,7 +183,7 @@ def get_activity(
 ) -> ActivityOut:
     activity = (
         db.query(Activity)
-        .options(joinedload(Activity.task))
+        .options(joinedload(Activity.task), joinedload(Activity.goal))
         .filter(Activity.id == activity_id, Activity.user_id == current_user.id)
         .first()
     )
@@ -179,7 +201,7 @@ def update_activity(
 ) -> ActivityOut:
     activity = (
         db.query(Activity)
-        .options(joinedload(Activity.task))
+        .options(joinedload(Activity.task), joinedload(Activity.goal))
         .filter(Activity.id == activity_id, Activity.user_id == current_user.id)
         .first()
     )
@@ -188,6 +210,23 @@ def update_activity(
 
     data = payload.model_dump(exclude_unset=True)
     category = activity.task.category if activity.task is not None else activity.category
+
+    if "goal_id" in data and activity.task is not None:
+        goal_id = data["goal_id"]
+        linked_goal_ids = [
+            row[0]
+            for row in db.execute(
+                select(goal_task_link.c.goal_id).where(
+                    goal_task_link.c.task_id == activity.task.id
+                )
+            ).all()
+        ]
+        if len(linked_goal_ids) > 1 and goal_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="This task is linked to multiple goals. Select which goal this log counts toward.",
+            )
+        validate_activity_goal_id(db, current_user.id, activity.task, goal_id)
 
     sleep_touched = "sleep_start_time" in data or "sleep_end_time" in data
     if category == "sleep" or sleep_touched:
@@ -224,7 +263,12 @@ def update_activity(
         setattr(activity, key, value)
     db.add(activity)
     db.commit()
-    db.refresh(activity)
+    activity = (
+        db.query(Activity)
+        .options(joinedload(Activity.task), joinedload(Activity.goal))
+        .filter(Activity.id == activity.id)
+        .first()
+    )
     return _activity_out(activity)
 
 

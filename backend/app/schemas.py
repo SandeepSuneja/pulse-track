@@ -89,6 +89,7 @@ class TaskOut(TaskBase):
 
 class ActivityBase(BaseModel):
     task_id: int
+    goal_id: Optional[int] = None
     notes: str = ""
     activity_date: date
     duration_minutes: int = Field(ge=1, le=24 * 60)
@@ -103,6 +104,7 @@ class ActivityCreate(ActivityBase):
 
 
 class ActivityUpdate(BaseModel):
+    goal_id: Optional[int] = None
     notes: Optional[str] = None
     activity_date: Optional[date] = None
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=24 * 60)
@@ -117,6 +119,8 @@ class ActivityOut(BaseModel):
     id: int
     user_id: int
     task_id: Optional[int]
+    goal_id: Optional[int] = None
+    goal_title: Optional[str] = None
     title: str
     category: str
     notes: str
@@ -212,6 +216,7 @@ class GoalOut(BaseModel):
     created_at: datetime
     task_ids: list[int] = Field(default_factory=list)
     tasks: list[GoalTaskBrief] = Field(default_factory=list)
+    logged_minutes: int = 0
 
 
 class TimeSeriesPoint(BaseModel):
