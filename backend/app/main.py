@@ -399,6 +399,77 @@ def backfill_health_task_types() -> None:
         )
 
 
+def ensure_postgres_goal_links() -> None:
+    """Many-to-many goal↔task links and activity goal attribution (Postgres/RDS)."""
+    with engine.begin() as conn:
+        link_exists = conn.execute(
+            text(
+                "SELECT EXISTS ("
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_name = 'goal_task_link'"
+                ")"
+            )
+        ).scalar()
+        if not link_exists:
+            conn.execute(
+                text(
+                    "CREATE TABLE goal_task_link ("
+                    "goal_id INTEGER NOT NULL PRIMARY KEY "
+                    "REFERENCES goals(id) ON DELETE CASCADE, "
+                    "task_id INTEGER NOT NULL "
+                    "REFERENCES tasks(id) ON DELETE CASCADE"
+                    ")"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_goal_task_link_task_id "
+                    "ON goal_task_link (task_id)"
+                )
+            )
+
+        task_cols = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'tasks'"
+                )
+            ).fetchall()
+        }
+        if task_cols and "goal_id" in task_cols:
+            conn.execute(
+                text(
+                    "INSERT INTO goal_task_link (goal_id, task_id) "
+                    "SELECT goal_id, id FROM tasks WHERE goal_id IS NOT NULL "
+                    "ON CONFLICT (goal_id) DO NOTHING"
+                )
+            )
+
+        activity_cols = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'activities'"
+                )
+            ).fetchall()
+        }
+        if activity_cols and "goal_id" not in activity_cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE activities ADD COLUMN goal_id INTEGER "
+                    "REFERENCES goals(id) ON DELETE SET NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_activities_goal_id "
+                    "ON activities (goal_id)"
+                )
+            )
+
+
 def ensure_goal_completion_pct_column() -> None:
     """Add user-set goal completion % on Postgres if missing."""
     with engine.begin() as conn:
@@ -428,6 +499,7 @@ async def lifespan(_app: FastAPI):
     else:
         ensure_activity_sleep_columns()
         ensure_health_columns()
+        ensure_postgres_goal_links()
         ensure_goal_completion_pct_column()
     backfill_health_task_types()
     db = SessionLocal()
