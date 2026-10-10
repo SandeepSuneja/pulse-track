@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'config/app_config.dart';
 import 'firebase_options.dart';
+import 'notifications/notification_controller.dart';
 import 'router/app_router.dart';
 import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
@@ -32,17 +33,28 @@ Future<void> main() async {
 
   final auth = AuthService();
   final themes = ThemeController();
-  await Future.wait([auth.bootstrap(), themes.load()]);
+  final notifications = NotificationController();
+  await Future.wait([
+    auth.bootstrap(),
+    themes.load(),
+    notifications.load(),
+  ]);
   AppTheme.bind(themes);
 
-  runApp(PulseTrackApp(auth: auth, themes: themes));
+  runApp(PulseTrackApp(auth: auth, themes: themes, notifications: notifications));
 }
 
 class PulseTrackApp extends StatelessWidget {
-  const PulseTrackApp({super.key, required this.auth, required this.themes});
+  const PulseTrackApp({
+    super.key,
+    required this.auth,
+    required this.themes,
+    required this.notifications,
+  });
 
   final AuthService auth;
   final ThemeController themes;
+  final NotificationController notifications;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +64,7 @@ class PulseTrackApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: auth),
         ChangeNotifierProvider.value(value: themes),
+        ChangeNotifierProvider.value(value: notifications),
         Provider.value(value: appRouter),
       ],
       child: Consumer<ThemeController>(

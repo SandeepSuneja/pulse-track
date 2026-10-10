@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/pulse_palette.dart';
 import '../theme/theme_rebuild.dart';
+import '../notifications/sync_notifications.dart';
 import '../widgets/brand.dart';
 import '../widgets/common.dart';
 
@@ -84,6 +85,7 @@ class _ActivitiesScreenState extends State<ActivitiesScreen> {
     final next = _load();
     setState(() => _future = next);
     await next;
+    if (mounted) await syncLocalNotifications(context);
   }
 
   bool get _filtersActive =>
