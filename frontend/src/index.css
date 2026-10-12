@@ -106,7 +106,7 @@ h2,
 
 .page {
   width: 100%;
-  max-width: 1200px;
+  max-width: 90%;
   margin: 0 auto;
   animation: rise-in 0.32s var(--ease);
 }

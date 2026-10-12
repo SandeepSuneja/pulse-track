@@ -1,7 +1,7 @@
 name: pulse_track_mobile
 description: Pulse Track mobile client — board, activities, goals, and analytics.
 publish_to: "none"
-version: 1.0.4+5
+version: 1.0.4+6
 
 environment:
   sdk: ^3.11.5
@@ -19,6 +19,9 @@ dependencies:
   intl: ^0.20.3
   shared_preferences: ^2.5.5
   fl_chart: ^1.2.0
+  flutter_local_notifications: ^19.0.0
+  timezone: ^0.10.0
+  flutter_timezone: ^4.1.0
 
 dev_dependencies:
   flutter_test:

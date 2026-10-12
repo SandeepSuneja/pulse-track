@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../config/app_config.dart';
+import '../notifications/local_notifications.dart';
+import '../notifications/notification_controller.dart';
+import '../notifications/notification_prefs.dart';
+import '../notifications/sync_notifications.dart';
 import '../services/auth_service.dart';
 import '../theme/pulse_palette.dart';
 import '../theme/theme_controller.dart';
@@ -84,6 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           IconButton(
             onPressed: () async {
+              await context.read<NotificationController>().onSignedOut();
               await auth.signOut();
             },
             icon: const Icon(Icons.logout),
@@ -103,6 +108,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : 'Signed in with Firebase',
               ),
             ),
+          ),
+          const SizedBox(height: 20),
+          _NotificationsSection(
+            onChanged: () async {
+              if (!mounted) return;
+              await syncLocalNotifications(context);
+            },
           ),
           const SizedBox(height: 20),
           Text(
@@ -176,6 +188,191 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+String _formatSyncTime(DateTime dt) {
+  final h = dt.hour.toString().padLeft(2, '0');
+  final m = dt.minute.toString().padLeft(2, '0');
+  return '$h:$m';
+}
+
+class _NotificationsSection extends StatelessWidget {
+  const _NotificationsSection({required this.onChanged});
+
+  final VoidCallback onChanged;
+
+  Future<void> _toggle(
+    BuildContext context,
+    Future<void> Function(NotificationPrefs p) edit,
+  ) async {
+    final ctrl = context.read<NotificationController>();
+    await ctrl.updatePrefs(edit);
+    onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = context.watch<NotificationController>();
+    final p = ctrl.prefs;
+    final palette = context.pulse;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Notifications',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+            color: palette.text,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Local reminders on this device. Reschedules when you open the app or refresh Board, Goals, or Activities.',
+          style: TextStyle(color: palette.muted, fontSize: 13),
+        ),
+        if (ctrl.syncing) ...[
+          const SizedBox(height: 8),
+          LinearProgressIndicator(
+            minHeight: 2,
+            color: palette.primary,
+            backgroundColor: palette.line,
+          ),
+        ],
+        if (ctrl.lastSyncError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            ctrl.lastSyncError!,
+            style: TextStyle(color: palette.warning, fontSize: 12),
+          ),
+        ] else if (ctrl.lastSyncAt != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            '${ctrl.lastPendingCount} reminder${ctrl.lastPendingCount == 1 ? '' : 's'} scheduled · '
+            'updated ${_formatSyncTime(ctrl.lastSyncAt!)}',
+            style: TextStyle(color: palette.muted, fontSize: 12),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton(
+              onPressed: ctrl.syncing
+                  ? null
+                  : () => syncLocalNotifications(context),
+              child: const Text('Reschedule now'),
+            ),
+            OutlinedButton(
+              onPressed: ctrl.syncing
+                  ? null
+                  : () => ctrl.showTestNotification(),
+              child: const Text('Test now'),
+            ),
+            OutlinedButton(
+              onPressed: ctrl.syncing
+                  ? null
+                  : () {
+                      final tz =
+                          context.read<AuthService>().profile?.timezone;
+                      ctrl.scheduleTestInTwoMinutes(profileTimezone: tz);
+                    },
+              child: const Text('Test in 2 min'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Enable notifications'),
+          value: p.enabled,
+          onChanged: (v) async {
+            await _toggle(context, (prefs) async {
+              prefs.enabled = v;
+            });
+            if (v && context.mounted) {
+              await LocalNotifications.instance.requestPermissions();
+            }
+          },
+        ),
+        if (p.enabled) ...[
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Goal deadlines'),
+            subtitle: const Text('Day before, due day, and day after'),
+            value: p.goalDeadlines,
+            onChanged: (v) => _toggle(context, (prefs) async {
+              prefs.goalDeadlines = v;
+            }),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Goal progress check-ins'),
+            value: p.goalPace,
+            onChanged: (v) => _toggle(context, (prefs) async {
+              prefs.goalPace = v;
+            }),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Overdue tasks'),
+            value: p.taskOverdue,
+            onChanged: (v) => _toggle(context, (prefs) async {
+              prefs.taskOverdue = v;
+            }),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Task start dates'),
+            value: p.taskStartDates,
+            onChanged: (v) => _toggle(context, (prefs) async {
+              prefs.taskStartDates = v;
+            }),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Stuck in progress'),
+            subtitle: Text('No log for ${p.stuckInProgressDays}+ days'),
+            value: p.taskStuckInProgress,
+            onChanged: (v) => _toggle(context, (prefs) async {
+              prefs.taskStuckInProgress = v;
+            }),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Daily log reminder'),
+            subtitle: Text(
+              'Daily at ${p.dailyLogHour.toString().padLeft(2, '0')}:${p.dailyLogMinute.toString().padLeft(2, '0')} when you have open tasks',
+            ),
+            value: p.dailyLogReminder,
+            onChanged: (v) => _toggle(context, (prefs) async {
+              prefs.dailyLogReminder = v;
+            }),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Weekly summary'),
+            subtitle: const Text('Sunday morning'),
+            value: p.weeklySummary,
+            onChanged: (v) => _toggle(context, (prefs) async {
+              prefs.weeklySummary = v;
+            }),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Sleep log reminder'),
+            subtitle: const Text('When you have sleep tasks in progress'),
+            value: p.sleepReminder,
+            onChanged: (v) => _toggle(context, (prefs) async {
+              prefs.sleepReminder = v;
+            }),
+          ),
+        ],
+      ],
     );
   }
 }
