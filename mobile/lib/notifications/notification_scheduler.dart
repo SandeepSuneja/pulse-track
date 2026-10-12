@@ -196,18 +196,32 @@ class NotificationScheduler {
       }
     }
 
-    if (prefs.dailyLogReminder && inProgress.isNotEmpty) {
-      if (loggedToday < 1) {
+    if (prefs.dailyLogReminder) {
+      final openWork = tasks.where((t) => t.status != 'completed').toList();
+      if (inProgress.isNotEmpty) {
         await local.scheduleDaily(
           id: NotificationIds.dailyLog,
           title: 'Log your work',
-          body:
-              'You have ${inProgress.length} in-progress task${inProgress.length == 1 ? '' : 's'}. Log time in Activities.',
+          body: loggedToday > 0
+              ? 'Keep your streak — log more time on your in-progress tasks when you can.'
+              : 'You have ${inProgress.length} in-progress task${inProgress.length == 1 ? '' : 's'}. Log time in Activities.',
           location: location,
           hour: prefs.dailyLogHour,
           minute: prefs.dailyLogMinute,
           androidChannelId: 'reminders',
           route: '/activities',
+        );
+      } else if (openWork.isNotEmpty) {
+        await local.scheduleDaily(
+          id: NotificationIds.dailyLog,
+          title: 'Pulse Track',
+          body:
+              'Move a task to In Progress on the Board, then log time in Activities.',
+          location: location,
+          hour: prefs.dailyLogHour,
+          minute: prefs.dailyLogMinute,
+          androidChannelId: 'reminders',
+          route: '/board',
         );
       }
     }

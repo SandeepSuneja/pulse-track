@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -66,7 +67,7 @@ class LocalNotifications {
           ch.$1,
           ch.$2,
           description: ch.$3,
-          importance: Importance.defaultImportance,
+          importance: Importance.high,
         ),
       );
     }
@@ -86,8 +87,11 @@ class LocalNotifications {
     if (Platform.isAndroid) {
       final android = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
+      final already = await android?.areNotificationsEnabled();
+      if (already == true) return true;
       final granted = await android?.requestNotificationsPermission();
-      return granted ?? true;
+      if (granted == true) return true;
+      return await android?.areNotificationsEnabled() ?? false;
     }
     return true;
   }
@@ -104,14 +108,54 @@ class LocalNotifications {
     candidates.add('UTC');
     for (final name in candidates) {
       try {
-        return tz.getLocation(name);
+        final location = tz.getLocation(name);
+        tz.setLocalLocation(location);
+        return location;
       } catch (_) {}
     }
+    tz.setLocalLocation(tz.UTC);
     return tz.UTC;
   }
 
   Future<void> cancelAll() async {
     await _plugin.cancelAll();
+  }
+
+  Future<int> pendingCount() async {
+    final pending = await _plugin.pendingNotificationRequests();
+    return pending.length;
+  }
+
+  /// Immediate notification to verify permission and channels.
+  Future<void> showTest({String route = '/board'}) async {
+    const android = AndroidNotificationDetails(
+      'reminders',
+      'Reminders',
+      channelDescription: 'Pulse Track reminders',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const ios = DarwinNotificationDetails();
+    await _plugin.show(
+      999999,
+      'Pulse Track',
+      'Notifications are working. Tap to open the app.',
+      const NotificationDetails(android: android, iOS: ios),
+      payload: jsonEncode({'route': route}),
+    );
+  }
+
+  Future<AndroidScheduleMode> _androidScheduleMode() async {
+    if (!Platform.isAndroid) {
+      return AndroidScheduleMode.inexactAllowWhileIdle;
+    }
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    final exactOk = await android?.canScheduleExactNotifications();
+    if (exactOk == true) {
+      return AndroidScheduleMode.exactAllowWhileIdle;
+    }
+    return AndroidScheduleMode.inexactAllowWhileIdle;
   }
 
   Future<void> scheduleZoned({
@@ -134,23 +178,31 @@ class LocalNotifications {
       androidChannelId,
       androidChannelId,
       channelDescription: null,
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
+      importance: Importance.high,
+      priority: Priority.high,
     );
     const iosDetails = DarwinNotificationDetails();
+    final mode = await _androidScheduleMode();
 
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      when,
-      NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      payload: payload,
-    );
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        when,
+        NotificationDetails(
+          android: androidDetails,
+          iOS: iosDetails,
+        ),
+        androidScheduleMode: mode,
+        payload: payload,
+      );
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('zonedSchedule failed id=$id: $e\n$st');
+      }
+      rethrow;
+    }
   }
 
   Future<void> scheduleDaily({
@@ -167,6 +219,7 @@ class LocalNotifications {
     when = _bumpIfPast(when);
 
     final payload = jsonEncode({'route': route});
+    final mode = await _androidScheduleMode();
 
     await _plugin.zonedSchedule(
       id,
@@ -177,11 +230,12 @@ class LocalNotifications {
         android: AndroidNotificationDetails(
           androidChannelId,
           androidChannelId,
-          importance: Importance.defaultImportance,
+          importance: Importance.high,
+          priority: Priority.high,
         ),
         iOS: const DarwinNotificationDetails(),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: mode,
       matchDateTimeComponents: DateTimeComponents.time,
       payload: payload,
     );
@@ -202,6 +256,7 @@ class LocalNotifications {
     when = _bumpIfPast(when);
 
     final payload = jsonEncode({'route': route});
+    final mode = await _androidScheduleMode();
 
     await _plugin.zonedSchedule(
       id,
@@ -212,13 +267,32 @@ class LocalNotifications {
         android: AndroidNotificationDetails(
           androidChannelId,
           androidChannelId,
-          importance: Importance.defaultImportance,
+          importance: Importance.high,
         ),
         iOS: const DarwinNotificationDetails(),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: mode,
       matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       payload: payload,
+    );
+  }
+
+  /// One-shot a few minutes from now (sanity check that scheduling works).
+  Future<void> scheduleSoonTest({
+    required tz.Location location,
+    int minutesFromNow = 2,
+  }) async {
+    final when = tz.TZDateTime.now(location).add(
+      Duration(minutes: minutesFromNow),
+    );
+    await scheduleZoned(
+      id: 999998,
+      title: 'Pulse Track reminder test',
+      body:
+          'If you see this, scheduled notifications are set up. Next reminders use your goals and tasks.',
+      when: when,
+      androidChannelId: 'reminders',
+      route: '/board',
     );
   }
 

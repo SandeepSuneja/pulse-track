@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../config/app_config.dart';
+import '../notifications/local_notifications.dart';
 import '../notifications/notification_controller.dart';
 import '../notifications/notification_prefs.dart';
 import '../notifications/sync_notifications.dart';
@@ -191,6 +192,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+String _formatSyncTime(DateTime dt) {
+  final h = dt.hour.toString().padLeft(2, '0');
+  final m = dt.minute.toString().padLeft(2, '0');
+  return '$h:$m';
+}
+
 class _NotificationsSection extends StatelessWidget {
   const _NotificationsSection({required this.onChanged});
 
@@ -235,14 +242,62 @@ class _NotificationsSection extends StatelessWidget {
             backgroundColor: palette.line,
           ),
         ],
+        if (ctrl.lastSyncError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            ctrl.lastSyncError!,
+            style: TextStyle(color: palette.warning, fontSize: 12),
+          ),
+        ] else if (ctrl.lastSyncAt != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            '${ctrl.lastPendingCount} reminder${ctrl.lastPendingCount == 1 ? '' : 's'} scheduled · '
+            'updated ${_formatSyncTime(ctrl.lastSyncAt!)}',
+            style: TextStyle(color: palette.muted, fontSize: 12),
+          ),
+        ],
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton(
+              onPressed: ctrl.syncing
+                  ? null
+                  : () => syncLocalNotifications(context),
+              child: const Text('Reschedule now'),
+            ),
+            OutlinedButton(
+              onPressed: ctrl.syncing
+                  ? null
+                  : () => ctrl.showTestNotification(),
+              child: const Text('Test now'),
+            ),
+            OutlinedButton(
+              onPressed: ctrl.syncing
+                  ? null
+                  : () {
+                      final tz =
+                          context.read<AuthService>().profile?.timezone;
+                      ctrl.scheduleTestInTwoMinutes(profileTimezone: tz);
+                    },
+              child: const Text('Test in 2 min'),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Enable notifications'),
           value: p.enabled,
-          onChanged: (v) => _toggle(context, (prefs) async {
-            prefs.enabled = v;
-          }),
+          onChanged: (v) async {
+            await _toggle(context, (prefs) async {
+              prefs.enabled = v;
+            });
+            if (v && context.mounted) {
+              await LocalNotifications.instance.requestPermissions();
+            }
+          },
         ),
         if (p.enabled) ...[
           SwitchListTile(
@@ -291,7 +346,7 @@ class _NotificationsSection extends StatelessWidget {
             contentPadding: EdgeInsets.zero,
             title: const Text('Daily log reminder'),
             subtitle: Text(
-              'Around ${p.dailyLogHour.toString().padLeft(2, '0')}:${p.dailyLogMinute.toString().padLeft(2, '0')} if nothing logged',
+              'Daily at ${p.dailyLogHour.toString().padLeft(2, '0')}:${p.dailyLogMinute.toString().padLeft(2, '0')} when you have open tasks',
             ),
             value: p.dailyLogReminder,
             onChanged: (v) => _toggle(context, (prefs) async {

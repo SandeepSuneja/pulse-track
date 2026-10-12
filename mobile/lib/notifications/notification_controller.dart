@@ -10,6 +10,9 @@ import 'notification_scheduler.dart';
 class NotificationController extends ChangeNotifier {
   final NotificationPrefs prefs = NotificationPrefs();
   bool _syncing = false;
+  String? lastSyncError;
+  int lastPendingCount = 0;
+  DateTime? lastSyncAt;
 
   bool get syncing => _syncing;
 
@@ -44,40 +47,80 @@ class NotificationController extends ChangeNotifier {
   }) async {
     if (_syncing) return;
     _syncing = true;
+    lastSyncError = null;
     notifyListeners();
     try {
       await prefs.load();
       if (!prefs.enabled) {
         await LocalNotifications.instance.cancelAll();
+        lastPendingCount = 0;
         return;
       }
+
       final granted = await LocalNotifications.instance.requestPermissions();
-      if (!granted && !kIsWeb) {
+      if (!granted) {
+        lastSyncError =
+            'Notification permission is off. Enable Pulse Track in system Settings → Notifications.';
         return;
       }
 
       final location =
           await LocalNotifications.instance.resolveLocation(profileTimezone);
 
-      final results = await Future.wait<Object>([
-        api.listGoals(),
-        api.listTasks(),
-        api.listActivities(
+      var goals = <GoalItem>[];
+      var tasks = <TaskItem>[];
+      var recentActivities = <ActivityItem>[];
+      final errors = <String>[];
+
+      try {
+        goals = await api.listGoals();
+      } catch (e) {
+        errors.add('goals: $e');
+      }
+      try {
+        tasks = await api.listTasks();
+      } catch (e) {
+        errors.add('tasks: $e');
+      }
+      try {
+        recentActivities = await api.listActivities(
           startDate: _daysAgoIso(60),
           endDate: isoToday(),
-        ),
-      ]);
+        );
+      } catch (e) {
+        errors.add('activities: $e');
+      }
+
+      if (errors.isNotEmpty &&
+          goals.isEmpty &&
+          tasks.isEmpty &&
+          recentActivities.isEmpty) {
+        lastSyncError =
+            'Could not load data to schedule reminders (${errors.first}). Check network and API.';
+        return;
+      }
+      if (errors.isNotEmpty && kDebugMode) {
+        debugPrint('Notification sync partial errors: ${errors.join('; ')}');
+      }
 
       await NotificationScheduler.reschedule(
         prefs: prefs,
         location: location,
-        goals: results[0] as List<GoalItem>,
-        tasks: results[1] as List<TaskItem>,
-        recentActivities: results[2] as List<ActivityItem>,
+        goals: goals,
+        tasks: tasks,
+        recentActivities: recentActivities,
       );
-    } catch (e) {
+
+      lastPendingCount = await LocalNotifications.instance.pendingCount();
+      lastSyncAt = DateTime.now();
+      if (lastPendingCount == 0 && prefs.enabled) {
+        lastSyncError =
+            'No reminders were scheduled yet (no matching due dates / in-progress tasks, or all times are in the past). Use “Test notification” below.';
+      }
+    } catch (e, st) {
+      lastSyncError = e.toString();
       if (kDebugMode) {
-        debugPrint('Notification sync failed: $e');
+        debugPrint('Notification sync failed: $e\n$st');
       }
     } finally {
       _syncing = false;
@@ -85,8 +128,39 @@ class NotificationController extends ChangeNotifier {
     }
   }
 
+  Future<void> showTestNotification() async {
+    lastSyncError = null;
+    final granted = await LocalNotifications.instance.requestPermissions();
+    if (!granted) {
+      lastSyncError = 'Notification permission denied.';
+      notifyListeners();
+      return;
+    }
+    await LocalNotifications.instance.showTest();
+    notifyListeners();
+  }
+
+  Future<void> scheduleTestInTwoMinutes({String? profileTimezone}) async {
+    lastSyncError = null;
+    final granted = await LocalNotifications.instance.requestPermissions();
+    if (!granted) {
+      lastSyncError = 'Notification permission denied.';
+      notifyListeners();
+      return;
+    }
+    final location =
+        await LocalNotifications.instance.resolveLocation(profileTimezone);
+    await LocalNotifications.instance.scheduleSoonTest(location: location);
+    lastPendingCount = await LocalNotifications.instance.pendingCount();
+    lastSyncAt = DateTime.now();
+    notifyListeners();
+  }
+
   Future<void> onSignedOut() async {
     await LocalNotifications.instance.cancelAll();
+    lastPendingCount = 0;
+    lastSyncError = null;
+    lastSyncAt = null;
   }
 
   static String _daysAgoIso(int days) {
