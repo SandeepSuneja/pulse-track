@@ -6,11 +6,11 @@ import 'package:http/http.dart' as http;
 class AppConfig {
   AppConfig._();
 
-  /// Deployed FastAPI origin (ECS Express Mode). Override with
+  /// Deployed FastAPI origin (Lambda + HTTP API). Override with
   /// `--dart-define=DEPLOYED_API_BASE_URL=https://…`.
   static const deployedApiBaseUrl = String.fromEnvironment(
     'DEPLOYED_API_BASE_URL',
-    defaultValue: 'https://pu-33c5978573c14366842f5c7087cb4002.ecs.us-east-1.on.aws',
+    defaultValue: 'https://d896tye5ji.execute-api.us-east-1.amazonaws.com',
   );
 
   /// Local backend when developing on emulator / host.

@@ -1,4 +1,8 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+const DEFAULT_PROD_API = 'https://d896tye5ji.execute-api.us-east-1.amazonaws.com'
+const API_URL = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? DEFAULT_PROD_API : 'http://127.0.0.1:8000')
+).replace(/\/$/, '')
 
 async function request(path, { method = 'GET', body, token } = {}) {
   const headers = { 'Content-Type': 'application/json' }

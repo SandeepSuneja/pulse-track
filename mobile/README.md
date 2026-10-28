@@ -65,7 +65,7 @@ On startup the app probes `http://127.0.0.1:8000/api/health`:
 Default deployed origin:
 
 ```text
-https://pu-33c5978573c14366842f5c7087cb4002.ecs.us-east-1.on.aws
+https://d896tye5ji.execute-api.us-east-1.amazonaws.com
 ```
 
 Overrides (`--dart-define`):
@@ -257,4 +257,4 @@ mobile/
 | Google sign-in fails | Add SHA-1, refresh `google-services.json`, full restart |
 | Theme only half-applied | Quit `flutter run` and **full restart** (not hot reload) |
 | Assets / theme not updating | Full restart |
-| Deployed API 503 | Confirm the ECS/App Runner URL; override `DEPLOYED_API_BASE_URL` |
+| Deployed API 503 | Confirm RDS is running and the Lambda URL; override `DEPLOYED_API_BASE_URL` |
