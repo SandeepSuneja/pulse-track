@@ -709,7 +709,7 @@ aws s3 sync dist/ "s3://$WebBucket/" --delete
             ["ECR repo", "pulse-track-api"],
             ["S3 web bucket", "pulse-track-web-529088267227"],
             ["ECS", "cluster default, service pulse-track-api (Express Mode / Fargate)"],
-            ["Example API URL", "https://pu-33c5978573c14366842f5c7087cb4002.ecs.us-east-1.on.aws"],
+            ["Example API URL", "https://d896tye5ji.execute-api.us-east-1.amazonaws.com"],
             ["SSM prefix", "/pulse-track/*"],
         ],
     )

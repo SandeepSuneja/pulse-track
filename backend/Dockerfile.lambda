@@ -1,0 +1,12 @@
+FROM public.ecr.aws/lambda/python:3.12
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEV_SKIP_AUTH=false
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ${LAMBDA_TASK_ROOT}/app
+
+CMD ["app.lambda_handler.handler"]

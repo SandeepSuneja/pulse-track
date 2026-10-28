@@ -207,7 +207,7 @@ Defaults (overridable with `--dart-define`):
 | Role | Default |
 |------|---------|
 | Local | `http://127.0.0.1:8000` |
-| Deployed | `https://pu-33c5978573c14366842f5c7087cb4002.ecs.us-east-1.on.aws` |
+| Deployed | `https://d896tye5ji.execute-api.us-east-1.amazonaws.com` |
 
 Emulator tip: `adb reverse tcp:8000 tcp:8000` so `127.0.0.1:8000` reaches the host backend.
 

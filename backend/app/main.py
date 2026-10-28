@@ -490,8 +490,8 @@ def ensure_goal_completion_pct_column() -> None:
             )
 
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
+def apply_database_migrations() -> None:
+    """Create/alter schema. Safe to run once against RDS before Lambda cutover."""
     settings = get_settings()
     Base.metadata.create_all(bind=engine)
     if settings.sqlalchemy_database_url.startswith("sqlite"):
@@ -507,6 +507,13 @@ async def lifespan(_app: FastAPI):
         ensure_legacy_custom_categories(db)
     finally:
         db.close()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    settings = get_settings()
+    if settings.should_apply_migrations_on_startup():
+        apply_database_migrations()
     try:
         init_firebase(settings)
     except RuntimeError:

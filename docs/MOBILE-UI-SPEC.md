@@ -50,7 +50,7 @@ Authorization: Bearer <firebase_id_token>
 Default deployed origin (override with `--dart-define=DEPLOYED_API_BASE_URL=…` or `API_BASE_URL=…`):
 
 ```text
-https://pu-33c5978573c14366842f5c7087cb4002.ecs.us-east-1.on.aws
+https://d896tye5ji.execute-api.us-east-1.amazonaws.com
 ```
 
 Production builds for real phones should rely on the deployed URL (or an explicit `API_BASE_URL`). Emulators may use `adb reverse` so `127.0.0.1:8000` reaches the host.

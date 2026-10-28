@@ -1,0 +1,63 @@
+name: Deploy Lambda API
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-lambda.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-lambda-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  LAMBDA_FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME }}
+
+jobs:
+  deploy-lambda:
+    name: Package and deploy Lambda zip
+    runs-on: ubuntu-latest
+    if: vars.LAMBDA_FUNCTION_NAME != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check required variables
+        run: |
+          if [ -z "${{ env.LAMBDA_FUNCTION_NAME }}" ]; then
+            echo "::error::Set GitHub variable LAMBDA_FUNCTION_NAME to pulse-track-api."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build zip and update function
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt -t pkg
+          cp -r backend/app pkg/app
+          find pkg -type d -name __pycache__ -exec rm -rf {} +
+          (cd pkg && zip -qr ../lambda.zip .)
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://lambda.zip \
+            --region "$AWS_REGION"
+          aws lambda wait function-updated \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION"

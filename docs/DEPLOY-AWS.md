@@ -6,6 +6,8 @@ Region used throughout: **ap-south-1** (Mumbai). Swap the region in every comman
 
 For product-level architecture (auth sequence, domain model, local vs AWS), see **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
 
+To move the API to **Lambda + API Gateway** while keeping the same RDS data, see **[DEPLOY-LAMBDA-PHASE1.md](./DEPLOY-LAMBDA-PHASE1.md)**.
+
 ```mermaid
 flowchart LR
   Browser --> CF[CloudFront]

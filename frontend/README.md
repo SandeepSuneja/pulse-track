@@ -36,7 +36,7 @@ Open **http://localhost:5173** (prefer `localhost` over `127.0.0.1` for Firebase
 
 | Variable | Purpose |
 |----------|---------|
-| `VITE_API_URL` | Backend origin, e.g. `http://127.0.0.1:8000` |
+| `VITE_API_URL` | Local: `http://127.0.0.1:8000`. Production builds use `.env.production` (Lambda API). |
 | `VITE_FIREBASE_*` | Web Firebase config from the Firebase console |
 
 ---
